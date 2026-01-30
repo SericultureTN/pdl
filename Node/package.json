@@ -1,0 +1,23 @@
+{
+  "name": "pdl-node-api-simple",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index-simple.js",
+    "dev-postgres": "node --watch src/index-postgres.js",
+    "start": "node src/index-simple.js",
+    "start-postgres": "node src/index-postgres.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "pg": "^8.17.2"
+  }
+}
