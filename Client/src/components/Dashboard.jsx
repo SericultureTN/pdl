@@ -1,16 +1,39 @@
-import { useState, useEffect } from "react";
-import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Activity, Building2 } from "lucide-react";
-import { authService } from "../services/auth.js";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Activity, Building2, ChevronDown, FileText, Package, Cpu, Factory, BarChart3, Settings } from 'lucide-react';
+import { authService } from '../services/auth.js';
 import { sericulturistService } from "../services/sericulturist.js";
 import UserList from "./UserList.jsx";
-import ADOfficeStats from "./ADOfficeStats.jsx";
+import MISDashboard from "./MISDashboard.jsx";
+import PLSDashboard from "./PLSDashboard.jsx";
+import PRCDashboard from "./PRCDashboard.jsx";
+import POCDashboard from "./POCDashboard.jsx";
+import ReportsDashboard from "./ReportsDashboard.jsx";
 import "./Dashboard.css";
+
+const REPORT_TYPES = [
+  "MIS",
+  "PLS", 
+  "PRC",
+  "POC"
+];
+
+const ALL_REPORT_TYPES = [
+  "MIS",
+  "PLS", 
+  "PRC",
+  "POC"
+];
 
 export default function Dashboard({ user, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState('overview');
+  const [showSectionDropdown, setShowSectionDropdown] = useState(false);
+  const [showReportsDropdown, setShowReportsDropdown] = useState(false);
+  const [selectedReport, setSelectedReport] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -40,6 +63,29 @@ export default function Dashboard({ user, onLogout }) {
   const handleLogout = async () => {
     await authService.logout();
     onLogout();
+  };
+
+  const handleReportSelect = (reportType) => {
+    setSelectedReport(reportType);
+    setShowSectionDropdown(false);
+    setShowReportsDropdown(false);
+    // Open in same tab for Section dropdown using React Router (NOT new tab)
+    const reportUrl = `/${reportType.toLowerCase()}-dashboard`;
+    console.log('Navigating to:', reportUrl, 'in same tab using React Router');
+    navigate(reportUrl);
+  };
+
+  const handleReportView = (reportType) => {
+    setSelectedReport(reportType);
+    setShowReportsDropdown(false);
+    // Open in same dashboard for Reports dropdown
+    setActiveView(reportType.toLowerCase());
+  };
+
+  const handleDownloadReport = (reportType) => {
+    console.log(`Downloading ${reportType} Report...`);
+    setShowReportsDropdown(false);
+    // Add actual download logic here
   };
 
   const StatCard = ({ icon, title, value, subtitle, color, trend }) => (
@@ -106,13 +152,77 @@ export default function Dashboard({ user, onLogout }) {
           </button>
         )}
         
-        <button
-          className={`nav-btn ${activeView === 'ad-offices' ? 'active' : ''}`}
-          onClick={() => setActiveView('ad-offices')}
+        <div 
+          className="nav-dropdown-wrapper"
+          onMouseEnter={() => setShowSectionDropdown(true)}
+          onMouseLeave={() => setShowSectionDropdown(false)}
         >
-          <Building2 size={16} />
-          {user.role === 'admin' ? 'AD Offices' : 'My Office'}
-        </button>
+          <button
+            className={`nav-btn ${activeView === 'ad-offices' ? 'active' : ''}`}
+          >
+            <Building2 size={16} />
+            {user.role === 'admin' ? 'Sections' : 'My Section'}
+            <ChevronDown size={14} className="dropdown-arrow" />
+          </button>
+          
+          {showSectionDropdown && (
+            <div className="nav-dropdown">
+              <div className="dropdown-header">
+                <Building2 size={16} />
+                <span>Section Reports</span>
+              </div>
+              {REPORT_TYPES.map(report => (
+                <button
+                  key={report}
+                  className="dropdown-item"
+                  onClick={() => handleReportSelect(report)}
+                >
+                  {report}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div 
+          className="nav-dropdown-wrapper"
+          onMouseEnter={() => setShowReportsDropdown(true)}
+          onMouseLeave={() => setShowReportsDropdown(false)}
+        >
+          <button className={`nav-btn ${activeView === 'reports-dashboard' ? 'active' : ''}`}>
+            <FileText size={16} />
+            Reports
+            <ChevronDown size={14} className="dropdown-arrow" />
+          </button>
+          
+          {showReportsDropdown && (
+            <div className="nav-dropdown">
+              <div className="dropdown-header">
+                <FileText size={16} />
+                <span>Report Options</span>
+              </div>
+              <button
+                className="dropdown-item"
+                onClick={() => {
+                  setActiveView('reports-dashboard');
+                  setShowReportsDropdown(false);
+                }}
+              >
+                📊 All Reports Dashboard
+              </button>
+              <div className="dropdown-divider"></div>
+              {ALL_REPORT_TYPES.map(report => (
+                <button
+                  key={report}
+                  className="dropdown-item"
+                  onClick={() => handleReportView(report)}
+                >
+                  {report} Dashboard
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
 
       <main className="dashboard-main">
@@ -226,10 +336,24 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        {activeView === 'ad-offices' && (
-          <div className="ad-offices-view">
-            <ADOfficeStats user={user} />
-          </div>
+        {activeView === 'mis' && (
+          <MISDashboard user={user} />
+        )}
+
+        {activeView === 'pls' && (
+          <PLSDashboard user={user} />
+        )}
+
+        {activeView === 'prc' && (
+          <PRCDashboard user={user} />
+        )}
+
+        {activeView === 'poc' && (
+          <POCDashboard user={user} />
+        )}
+
+        {activeView === 'reports-dashboard' && (
+          <ReportsDashboard user={user} />
         )}
       </main>
     </div>

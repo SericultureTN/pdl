@@ -162,37 +162,36 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
 
             <div className="form-group">
               <label>
-                <Calendar size={16} />
-                AD office
+                <MapPin size={16} />
+                Section
               </label>
-
-                <select
-                  name="ad_office"
-                  value={formData.ad_office}
-                  onChange={handleChange}
-                >
-                  <option value="">--Select AD office--</option>
-                  <option value="Hosur">Hosur</option>
-                  <option value="Denkanikkottai">Denkanikkottai</option>
-                  <option value="Krishnagiri">Krishnagiri</option>
-                  <option value="Dharmapuri">Dharmapuri</option>
-                  <option value="Pennagaram">Pennagaram</option>
-                  <option value="Salem">Salem</option>
-                  <option value="Coimbatore">Coimbatore</option>
-                  <option value="Udumalpet">Udumalpet</option>
-                  <option value="Erode">Erode</option>
-                  <option value="Talavady">Talavady</option>
-                  <option value="Coonoor">Coonoor</option>
-                  <option value="Vaniyambadi">Vaniyambadi</option>
-                  <option value="Tiruvannamalai">Tiruvannamalai</option>
-                  <option value="Villuppuram">Villuppuram</option>
-                  <option value="Trichy">Trichy</option>
-                  <option value="Namakkal">Namakkal</option>
-                  <option value="Dindigul">Dindigul</option>
-                  <option value="Theni">Theni</option>
-                  <option value="Tenkasi">Tenkasi</option>
-                </select>
-              </div>
+              <select
+                name="ad_office"
+                value={formData.ad_office}
+                onChange={handleChange}
+              >
+                <option value="">--Select Section--</option>
+                <option value="Hosur">Hosur</option>
+                <option value="Denkanikkottai">Denkanikkottai</option>
+                <option value="Krishnagiri">Krishnagiri</option>
+                <option value="Dharmapuri">Dharmapuri</option>
+                <option value="Pennagaram">Pennagaram</option>
+                <option value="Salem">Salem</option>
+                <option value="Coimbatore">Coimbatore</option>
+                <option value="Udumalpet">Udumalpet</option>
+                <option value="Erode">Erode</option>
+                <option value="Talavady">Talavady</option>
+                <option value="Coonoor">Coonoor</option>
+                <option value="Vaniyambadi">Vaniyambadi</option>
+                <option value="Tiruvannamalai">Tiruvannamalai</option>
+                <option value="Villuppuram">Villuppuram</option>
+                <option value="Trichy">Trichy</option>
+                <option value="Namakkal">Namakkal</option>
+                <option value="Dindigul">Dindigul</option>
+                <option value="Theni">Theni</option>
+                <option value="Tenkasi">Tenkasi</option>
+              </select>
+            </div>
 
             <div className="form-group">
               <label>

@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import Login from './components/Login.jsx';
 import Dashboard from './components/Dashboard.jsx';
+import MISPage from './pages/MISPage.jsx';
+import PLSPage from './pages/PLSPage.jsx';
+import PRCPage from './pages/PRCPage.jsx';
+import POCPage from './pages/POCPage.jsx';
 import { authService } from './services/auth.js';
 import './App.css';
 
@@ -54,7 +59,13 @@ function App() {
   }
 
   return user ? (
-    <Dashboard user={user} onLogout={handleLogout} />
+    <Routes>
+      <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />} />
+      <Route path="/mis-dashboard" element={<MISPage />} />
+      <Route path="/pls-dashboard" element={<PLSPage />} />
+      <Route path="/prc-dashboard" element={<PRCPage />} />
+      <Route path="/poc-dashboard" element={<POCPage />} />
+    </Routes>
   ) : (
     <Login onLogin={handleLogin} />
   );

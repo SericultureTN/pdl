@@ -239,7 +239,7 @@ export default function UserList() {
               <th>Email</th>
               <th>Phone</th>
               <th>Role</th>
-              <th>AD Office</th>
+              <th>Section</th>
               <th>Status</th>
               <th>Joined</th>
               <th>Actions</th>

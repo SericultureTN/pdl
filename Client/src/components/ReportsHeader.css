@@ -1,0 +1,256 @@
+/* ReportsHeader.css - Modern reports header styling */
+
+.reports-header-container {
+  width: 100%;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.reports-header {
+  position: relative;
+  display: inline-block;
+}
+
+.reports-dropdown-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.reports-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: none;
+  border: none;
+  color: #374151;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 0.5rem;
+}
+
+.reports-button:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.dropdown-arrow {
+  margin-left: 0.25rem;
+  transition: transform 0.2s ease;
+}
+
+.reports-dropdown-wrapper:hover .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.reports-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  min-width: 280px;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+}
+
+.dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 0.25rem;
+}
+
+.report-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.report-dropdown-item:hover {
+  background: #f9fafb;
+  color: #1f2937;
+}
+
+.report-dropdown-item:active {
+  background: #f3f4f6;
+}
+
+.report-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.report-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.report-description {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Selected Report View */
+.selected-report-view {
+  padding: 1.5rem;
+}
+
+.report-back-button {
+  margin-bottom: 1rem;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.report-details {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+}
+
+.report-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border-radius: 0.75rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+.report-info {
+  flex: 1;
+}
+
+.report-info h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.report-info p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.report-actions {
+  flex-shrink: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .reports-dropdown {
+    min-width: 240px;
+  }
+  
+  .report-details {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .report-actions {
+    width: 100%;
+  }
+  
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .reports-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .selected-report-view {
+    padding: 1rem;
+  }
+  
+  .report-details {
+    padding: 1rem;
+  }
+  
+  .report-icon {
+    width: 3rem;
+    height: 3rem;
+  }
+  
+  .report-info h2 {
+    font-size: 1.25rem;
+  }
+}
