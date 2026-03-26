@@ -1,0 +1,1 @@
+Trigger new Vercel build with latest commit containing security fixes
