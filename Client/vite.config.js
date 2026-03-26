@@ -12,5 +12,19 @@ export default defineConfig({
         credentials: true
       }
     }
-  }
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom']
+        }
+      }
+    }
+  },
+  base: process.env.NODE_ENV === 'production' ? '/' : '/'
 })
