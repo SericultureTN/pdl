@@ -38,8 +38,9 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        const API_BASE = import.meta.env.VITE_API_URL || 'https://pdltn.vercel.app/api';
         const [dashboardRes, statsRes] = await Promise.all([
-          fetch("http://localhost:4000/api/admin/dashboard", {
+          fetch(`${API_BASE}/admin/dashboard`, {
             credentials: "include",
           }),
           sericulturistService.getStatistics()
