@@ -12,6 +12,14 @@
     {
       "src": "api/me.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/register.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/users.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -26,6 +34,14 @@
     {
       "src": "/api/me", 
       "dest": "/api/me.js"
+    },
+    {
+      "src": "/api/register",
+      "dest": "/api/register.js"
+    },
+    {
+      "src": "/api/users",
+      "dest": "/api/users.js"
     }
   ]
 }
