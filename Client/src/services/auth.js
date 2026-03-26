@@ -3,10 +3,14 @@ import axios from 'axios';
 // Dynamic API URL based on environment
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
+// Fallback for Vercel deployment
+const FALLBACK_API_URL = 'https://your-backend-url.com/api';
+const FINAL_API_URL = API_BASE_URL || FALLBACK_API_URL;
+
 export const authService = {
   async login(email, password) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/login`, {
+      const response = await axios.post(`${FINAL_API_URL}/login`, {
         email,
         password
       }, {
@@ -20,7 +24,7 @@ export const authService = {
 
   async logout() {
     try {
-      const response = await axios.post(`${API_BASE_URL}/admin/logout`, {}, {
+      const response = await axios.post(`${FINAL_API_URL}/admin/logout`, {}, {
         withCredentials: true
       });
       return response.data;
@@ -32,7 +36,7 @@ export const authService = {
   async getCurrentUser() {
     try {
       console.log('Making request to getCurrentUser...');
-      const response = await axios.get(`${API_BASE_URL}/me`, {
+      const response = await axios.get(`${FINAL_API_URL}/me`, {
         withCredentials: true,
         timeout: 5000 // 5 second timeout
       });
