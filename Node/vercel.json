@@ -20,6 +20,10 @@
     {
       "src": "api/users.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/sericulturists.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -42,6 +46,10 @@
     {
       "src": "/api/users",
       "dest": "/api/users.js"
+    },
+    {
+      "src": "/api/sericulturists",
+      "dest": "/api/sericulturists.js"
     }
   ]
 }
