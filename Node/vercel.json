@@ -12,12 +12,8 @@
       "dest": "/api/health.js"
     },
     {
-      "src": "/api/login",
-      "dest": "/api/login.js"
-    },
-    {
-      "src": "/api/me",
-      "dest": "/api/me.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     }
   ]
 }
