@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "src/index-postgres.js",
+  "main": "src/api/index.js",
   "scripts": {
     "dev": "node --watch src/index-simple.js",
     "dev-postgres": "node --watch src/index-postgres.js",
@@ -12,6 +12,7 @@
     "build": "echo 'Build completed'"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.6",

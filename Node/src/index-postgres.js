@@ -600,27 +600,24 @@ const startServer = async () => {
     const dbConnected = await testConnection();
     if (!dbConnected) {
       console.error('❌ Failed to connect to database. Please check your PostgreSQL configuration.');
-      process.exit(1);
+      return;
     }
 
     // Initialize database schema
     const schemaInitialized = await initializeDatabase();
     if (!schemaInitialized) {
       console.error('❌ Failed to initialize database schema.');
-      process.exit(1);
+      return;
     }
-
-    // Start listening
-    app.listen(PORT, () => {
-      console.log(`✅ Server running on http://localhost:${PORT}`);
-      console.log(`🔗 Frontend should be: ${CORS_ORIGIN}`);
-      console.log(`🗄️  Database: PostgreSQL`);
-      console.log(`📊 Health check: http://localhost:${PORT}/health`);
-    });
+    
+    console.log('✅ Server ready for serverless deployment');
   } catch (error) {
     console.error('❌ Failed to start server:', error);
-    process.exit(1);
   }
 };
 
+// Initialize server for serverless
 startServer();
+
+// Export for Vercel serverless
+export default app;
