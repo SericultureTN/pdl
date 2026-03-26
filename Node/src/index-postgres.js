@@ -8,6 +8,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { testConnection, initializeDatabase, closePool, query } from './postgres.js';
 import { sericulturistServices } from './sericulturist-services.js';
+import { authServices } from './auth-postgres.js';
 
 const app = express();
 
