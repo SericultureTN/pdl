@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "src/index-postgres.js",
   "scripts": {
     "dev": "node --watch src/index-simple.js",
     "dev-postgres": "node --watch src/index-postgres.js",
