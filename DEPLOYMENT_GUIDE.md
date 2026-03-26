@@ -38,7 +38,7 @@ vercel --prod
 #### Option B: Via Vercel Dashboard
 1. Go to https://vercel.com/dashboard
 2. Click "Add New..." → "Project"
-3. Import your GitHub repository
+3. Import your GitHub repository  
 4. Configure settings (see below)
 5. Click "Deploy"
 
