@@ -7,7 +7,8 @@
     "dev": "node --watch src/index-simple.js",
     "dev-postgres": "node --watch src/index-postgres.js",
     "start": "node src/index-simple.js",
-    "start-postgres": "node src/index-postgres.js"
+    "start-postgres": "node src/index-postgres.js",
+    "build": "echo 'Build completed'"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/index-postgres.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/src/index-postgres.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
