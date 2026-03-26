@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/health.js",
+      "src": "api/*.js",
       "use": "@vercel/node"
     }
   ],
@@ -10,6 +10,14 @@
     {
       "src": "/health",
       "dest": "/api/health.js"
+    },
+    {
+      "src": "/api/login",
+      "dest": "/api/login.js"
+    },
+    {
+      "src": "/api/me",
+      "dest": "/api/me.js"
     }
   ]
 }
