@@ -242,26 +242,52 @@
   border: 0;
 }
 
-/* Responsive design */
+/* Enhanced Mobile Responsive Design */
 @media (max-width: 640px) {
   .login-container {
-    padding: 1rem;
+    padding: 1rem 0.5rem;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
   }
   
   .login-form-wrapper {
     max-width: 100%;
+    margin: 0 0.5rem;
   }
   
   .login-form {
     padding: 1.5rem;
+    border-radius: 0.75rem;
+  }
+  
+  .login-header {
+    margin-bottom: 1.5rem;
   }
   
   .login-title {
     font-size: 1.5rem;
+    line-height: 1.1;
+  }
+  
+  .login-subtitle {
+    font-size: 0.8rem;
+  }
+  
+  .login-icon-wrapper {
+    width: 3.5rem;
+    height: 3.5rem;
+    margin-bottom: 1.25rem;
+  }
+  
+  .login-icon {
+    width: 1.75rem;
+    height: 1.75rem;
   }
   
   .login-input {
-    padding: 0.75rem 1rem 0.75rem 2.75rem;
+    padding: 0.875rem 1rem 0.875rem 2.75rem;
+    font-size: 0.875rem;
   }
   
   .input-icon {
@@ -271,28 +297,290 @@
   }
   
   .password-toggle {
-    right: 0.75rem;
+    right: 0.875rem;
+  }
+  
+  .password-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+  
+  .login-button {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .error-message {
+    padding: 0.625rem;
+    font-size: 0.8rem;
   }
 }
 
 @media (max-width: 480px) {
+  .login-container {
+    padding: 0.5rem;
+  }
+  
+  .login-form-wrapper {
+    margin: 0;
+  }
+  
   .login-form {
     padding: 1.25rem;
-    border-radius: 0.75rem;
+    border-radius: 0.5rem;
+  }
+  
+  .login-header {
+    margin-bottom: 1.25rem;
   }
   
   .login-title {
     font-size: 1.375rem;
+    margin-bottom: 0.375rem;
+  }
+  
+  .login-subtitle {
+    font-size: 0.75rem;
   }
   
   .login-icon-wrapper {
-    width: 3.5rem;
-    height: 3.5rem;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 1rem;
   }
   
   .login-icon {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  
+  .login-input {
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    font-size: 0.8rem;
+  }
+  
+  .input-icon {
+    left: 0.75rem;
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .password-toggle {
+    right: 0.75rem;
+  }
+  
+  .password-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .login-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+  }
+  
+  .error-message {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+  
+  .input-group {
+    margin-bottom: 1.25rem;
+  }
+}
+
+/* Ultra Mobile (Small phones) */
+@media (max-width: 360px) {
+  .login-container {
+    padding: 0.25rem;
+  }
+  
+  .login-form {
+    padding: 1rem;
+  }
+  
+  .login-title {
+    font-size: 1.25rem;
+  }
+  
+  .login-subtitle {
+    font-size: 0.7rem;
+  }
+  
+  .login-icon-wrapper {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  
+  .login-icon {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+  
+  .login-input {
+    padding: 0.625rem 0.875rem 0.625rem 2.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .input-icon {
+    left: 0.625rem;
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+  
+  .password-toggle {
+    right: 0.625rem;
+  }
+  
+  .password-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+  
+  .login-button {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.75rem;
+  }
+  
+  .error-message {
+    padding: 0.375rem;
+    font-size: 0.7rem;
+  }
+  
+  .input-group {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Mobile Landscape */
+@media (max-width: 640px) and (orientation: landscape) {
+  .login-container {
+    padding: 0.5rem;
+  }
+  
+  .login-header {
+    margin-bottom: 1rem;
+  }
+  
+  .login-icon-wrapper {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .login-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  
+  .login-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .login-subtitle {
+    font-size: 0.75rem;
+  }
+  
+  .login-form {
+    padding: 1rem;
+  }
+  
+  .input-group {
+    margin-bottom: 0.75rem;
+  }
+  
+  .login-input {
+    padding: 0.625rem 1rem 0.625rem 2.25rem;
+    font-size: 0.8rem;
+  }
+  
+  .login-button {
+    padding: 0.625rem 1rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Mobile Touch Optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .login-button:hover {
+    transform: none;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .login-button:active {
+    transform: scale(0.98);
+  }
+  
+  .password-toggle:hover {
+    color: #6b7280;
+  }
+  
+  .password-toggle:active {
+    color: #4b5563;
+    transform: scale(0.95);
+  }
+  
+  .login-input:focus {
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+  }
+}
+
+/* High DPI / Retina Displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .login-icon-wrapper {
+    border-width: 1px;
+  }
+  
+  .login-form {
+    border-width: 0.5px;
+  }
+  
+  .login-input {
+    border-width: 1px;
+  }
+}
+
+/* iOS Safari Specific Fixes */
+@supports (-webkit-touch-callout: none) {
+  .login-input {
+    -webkit-appearance: none;
+    border-radius: 0.5rem;
+  }
+  
+  .login-button {
+    -webkit-appearance: none;
+    border-radius: 0.5rem;
+  }
+  
+  .password-toggle {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Android Chrome Specific Fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  .login-input {
+    font-size: 16px; /* Prevent zoom on focus */
+  }
+  
+  .login-input:focus {
+    font-size: 16px;
+  }
+}
+
+/* iPad and Large Tablets */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .login-form-wrapper {
+    max-width: 450px;
+  }
+  
+  .login-form {
+    padding: 2rem;
+  }
+  
+  .login-title {
+    font-size: 1.75rem;
   }
 }
 
