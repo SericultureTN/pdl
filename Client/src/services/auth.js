@@ -3,8 +3,8 @@ import axios from 'axios';
 // Dynamic API URL based on environment
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
-// Fallback for Vercel deployment - you need to deploy your backend separately
-const FALLBACK_API_URL = 'https://your-backend-deployment-url.com/api';
+// Fallback for Vercel deployment - using your actual Vercel URL
+const FALLBACK_API_URL = 'https://pdltn.vercel.app/api';
 const FINAL_API_URL = API_BASE_URL || FALLBACK_API_URL;
 
 // Create axios instance with default configuration

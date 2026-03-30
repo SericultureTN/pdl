@@ -40,7 +40,7 @@ export default function Dashboard({ user, onLogout }) {
     const fetchDashboardData = async () => {
       try {
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-        const FALLBACK_API = 'https://your-backend-deployment-url.com/api';
+        const FALLBACK_API = 'https://pdltn.vercel.app/api';
         const FINAL_API = API_BASE || FALLBACK_API;
         
         console.log('Dashboard fetching from:', FINAL_API);
