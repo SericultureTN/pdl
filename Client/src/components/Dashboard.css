@@ -386,6 +386,128 @@
   color: #6b7280;
 }
 
+/* Mobile Navigation Styles */
+.mobile-menu-toggle {
+  display: none;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  color: white;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.mobile-menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.mobile-nav-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.mobile-nav-menu {
+  background: white;
+  border-radius: 1rem;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: slideUp 0.3s ease-out;
+}
+
+.mobile-nav-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mobile-nav-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.mobile-nav-close {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.mobile-nav-close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.mobile-nav-items {
+  padding: 1rem;
+}
+
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: none;
+  border: none;
+  border-radius: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.mobile-nav-item:hover {
+  background: #f8fafc;
+  color: #1f2937;
+}
+
+.mobile-nav-item.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.mobile-nav-item svg {
+  flex-shrink: 0;
+}
+
+.mobile-nav-section {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.mobile-nav-section h4 {
+  margin: 0 0 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Enhanced Mobile Responsive Design */
 @media (max-width: 768px) {
   .header-content {
@@ -395,24 +517,37 @@
     padding: 0.75rem 1rem;
   }
   
+  .mobile-menu-toggle {
+    display: flex;
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 1001;
+  }
+  
+  .header-right {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .user-info {
+    padding: 0.5rem 1rem;
+    min-width: auto;
+  }
+  
+  .logout-btn {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.85rem;
+  }
+  
   .dashboard-nav {
     padding: 0 1rem;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
-  }
-  
-  .dashboard-nav::-webkit-scrollbar {
-    height: 3px;
-  }
-  
-  .dashboard-nav::-webkit-scrollbar-track {
-    background: #f1f5f9;
-  }
-  
-  .dashboard-nav::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
+    display: none; /* Hide desktop nav on mobile */
   }
   
   .dashboard-main {
@@ -452,27 +587,6 @@
     opacity: 0.95;
   }
   
-  .header-right {
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  
-  .user-info span {
-    display: inline;
-  }
-  
-  .user-info {
-    padding: 0.5rem 1rem;
-    min-width: auto;
-  }
-  
-  .logout-btn {
-    padding: 0.5rem 1.25rem;
-    font-size: 0.85rem;
-  }
-  
-  /* Mobile Navigation Improvements */
   .nav-btn {
     padding: 0.75rem 1rem;
     font-size: 0.8rem;
@@ -484,7 +598,6 @@
     background: #f8fafc;
   }
   
-  /* Mobile Card Improvements */
   .stat-card {
     padding: 1.25rem;
   }
@@ -500,6 +613,38 @@
   
   .card-header h3 {
     font-size: 0.9rem;
+  }
+  
+  .mobile-nav-menu {
+    width: 95%;
+    max-width: 350px;
+  }
+  
+  .mobile-nav-header {
+    padding: 1rem 1.5rem;
+  }
+  
+  .mobile-nav-header h3 {
+    font-size: 1.125rem;
+  }
+  
+  .mobile-nav-items {
+    padding: 0.75rem;
+  }
+  
+  .mobile-nav-item {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .mobile-nav-item svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .mobile-nav-section h4 {
+    margin: 0 0 0.5rem 0.75rem;
+    font-size: 0.7rem;
   }
   
   /* Mobile Activity Items */
@@ -537,6 +682,7 @@
   
   .header-right {
     justify-content: center;
+    gap: 0.25rem;
   }
   
   .user-info span {
@@ -546,6 +692,17 @@
   .logout-btn {
     padding: 0.5rem 1rem;
     font-size: 0.8rem;
+  }
+  
+  .mobile-menu-toggle {
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.375rem;
+  }
+  
+  .mobile-menu-toggle svg {
+    width: 20px;
+    height: 20px;
   }
   
   .nav-btn {
@@ -589,6 +746,38 @@
   
   .dashboard-cards {
     gap: 0.75rem;
+  }
+  
+  .mobile-nav-menu {
+    width: 90%;
+    max-width: 300px;
+  }
+  
+  .mobile-nav-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .mobile-nav-header h3 {
+    font-size: 1rem;
+  }
+  
+  .mobile-nav-items {
+    padding: 0.5rem;
+  }
+  
+  .mobile-nav-item {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  
+  .mobile-nav-item svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .mobile-nav-section h4 {
+    margin: 0 0 0.5rem 0.75rem;
+    font-size: 0.65rem;
   }
   
   /* Mobile Info Items */

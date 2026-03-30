@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Activity, Building2, ChevronDown, FileText, Package, Cpu, Factory, BarChart3, Settings } from 'lucide-react';
+import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Activity, Building2, ChevronDown, FileText, Package, Cpu, Factory, BarChart3, Settings, Menu, X } from 'lucide-react';
 import { authService } from '../services/auth.js';
 import { sericulturistService } from "../services/sericulturist.js";
 import UserList from "./UserList.jsx";
@@ -33,6 +33,7 @@ export default function Dashboard({ user, onLogout }) {
   const [showSectionDropdown, setShowSectionDropdown] = useState(false);
   const [showReportsDropdown, setShowReportsDropdown] = useState(false);
   const [selectedReport, setSelectedReport] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,6 +65,15 @@ export default function Dashboard({ user, onLogout }) {
   const handleLogout = async () => {
     await authService.logout();
     onLogout();
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const handleMobileNavClick = (view) => {
+    setActiveView(view);
+    setMobileMenuOpen(false);
   };
 
   const handleReportSelect = (reportType) => {
@@ -122,6 +132,15 @@ export default function Dashboard({ user, onLogout }) {
           </div>
           
           <div className="header-right">
+            {/* Mobile Menu Toggle */}
+            <button 
+              className="mobile-menu-toggle" 
+              onClick={toggleMobileMenu}
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+            
             <div className="user-info">
               <User size={20} />
               <span>{user?.email}</span>
@@ -133,6 +152,62 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         </div>
       </header>
+
+      {/* Mobile Navigation Overlay */}
+      {mobileMenuOpen && (
+        <div className="mobile-nav-overlay" onClick={toggleMobileMenu}>
+          <div className="mobile-nav-menu" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-nav-header">
+              <h3>Navigation</h3>
+              <button className="mobile-nav-close" onClick={toggleMobileMenu}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="mobile-nav-items">
+              <button
+                className={`mobile-nav-item ${activeView === 'overview' ? 'active' : ''}`}
+                onClick={() => handleMobileNavClick('overview')}
+              >
+                <Activity size={20} />
+                <span>Overview</span>
+              </button>
+              
+              {user.role === 'admin' && (
+                <button
+                  className={`mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
+                  onClick={() => handleMobileNavClick('users')}
+                >
+                  <Users size={20} />
+                  <span>Users</span>
+                </button>
+              )}
+              
+              <div className="mobile-nav-section">
+                <h4>Sections</h4>
+                {REPORT_TYPES.map(report => (
+                  <button
+                    key={report}
+                    className="mobile-nav-item"
+                    onClick={() => handleReportSelect(report)}
+                  >
+                    <Building2 size={20} />
+                    <span>{report} Report</span>
+                  </button>
+                ))}
+              </div>
+              
+              <button
+                className={`mobile-nav-item ${activeView === 'reports-dashboard' ? 'active' : ''}`}
+                onClick={() => handleMobileNavClick('reports-dashboard')}
+              >
+                <FileText size={20} />
+                <span>Reports</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="dashboard-nav">
         <button
