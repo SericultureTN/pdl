@@ -8,6 +8,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { testConnection, initializeDatabase, closePool, query } from './postgres.js';
 import { sericulturistServices } from './sericulturist-services.js';
+import { authServices } from './auth-postgres.js';
 
 const app = express();
 
@@ -21,7 +22,17 @@ app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: CORS_ORIGIN,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = CORS_ORIGIN.split(',');
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true
   })
 );
@@ -589,27 +600,24 @@ const startServer = async () => {
     const dbConnected = await testConnection();
     if (!dbConnected) {
       console.error('❌ Failed to connect to database. Please check your PostgreSQL configuration.');
-      process.exit(1);
+      return;
     }
 
     // Initialize database schema
     const schemaInitialized = await initializeDatabase();
     if (!schemaInitialized) {
       console.error('❌ Failed to initialize database schema.');
-      process.exit(1);
+      return;
     }
-
-    // Start listening
-    app.listen(PORT, () => {
-      console.log(`✅ Server running on http://localhost:${PORT}`);
-      console.log(`🔗 Frontend should be: ${CORS_ORIGIN}`);
-      console.log(`🗄️  Database: PostgreSQL`);
-      console.log(`📊 Health check: http://localhost:${PORT}/health`);
-    });
+    
+    console.log('✅ Server ready for serverless deployment');
   } catch (error) {
     console.error('❌ Failed to start server:', error);
-    process.exit(1);
   }
 };
 
+// Initialize server for serverless
 startServer();
+
+// Export for Vercel serverless
+export default app;
