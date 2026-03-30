@@ -173,6 +173,114 @@
   border-color: #3b82f6 !important;
 }
 
+/* Mobile Navigation Styles */
+.mis-mobile-menu-toggle {
+  display: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  color: white;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.mis-mobile-menu-toggle:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: scale(1.05);
+}
+
+.mis-mobile-nav-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.mis-mobile-nav-menu {
+  background: white;
+  border-radius: 1rem;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: slideUp 0.3s ease-out;
+}
+
+.mis-mobile-nav-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mis-mobile-nav-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.mis-mobile-nav-close {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.mis-mobile-nav-close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.mis-mobile-nav-items {
+  padding: 1rem;
+}
+
+.mis-mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: none;
+  border: none;
+  border-radius: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.mis-mobile-nav-item:hover {
+  background: #f8fafc;
+  color: #1f2937;
+}
+
+.mis-mobile-nav-item.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+}
+
+.mis-mobile-nav-item svg {
+  flex-shrink: 0;
+}
+
 /* Enhanced Mobile Responsive Design */
 @media (max-width: 768px) {
   .mis-sidebar {
@@ -200,6 +308,12 @@
   .mis-page-header-left p {
     font-size: 0.9rem;
     text-align: center;
+  }
+  
+  .mis-page-header-right {
+    justify-content: center;
+    gap: 0.5rem;
+    align-items: center;
   }
   
   .mis-back-btn {
@@ -273,9 +387,26 @@
     font-size: 0.85rem;
   }
   
+  .mis-page-header-right {
+    justify-content: center;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
   .mis-back-btn {
     padding: 0.5rem 0.875rem;
     font-size: 0.75rem;
+  }
+  
+  .mis-mobile-menu-toggle {
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.375rem;
+  }
+  
+  .mis-mobile-menu-toggle svg {
+    width: 20px;
+    height: 20px;
   }
   
   .mis-content-area {
@@ -310,6 +441,33 @@
   .mis-sidebar-item svg {
     width: 14px;
     height: 14px;
+  }
+  
+  .mis-mobile-nav-menu {
+    width: 90%;
+    max-width: 300px;
+  }
+  
+  .mis-mobile-nav-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .mis-mobile-nav-header h3 {
+    font-size: 1rem;
+  }
+  
+  .mis-mobile-nav-items {
+    padding: 0.5rem;
+  }
+  
+  .mis-mobile-nav-item {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  
+  .mis-mobile-nav-item svg {
+    width: 16px;
+    height: 16px;
   }
 }
 

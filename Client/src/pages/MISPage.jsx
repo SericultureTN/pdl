@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Home, Users, Settings, BarChart3 } from "lucide-react";
+import { ArrowLeft, FileText, Home, Users, Settings, BarChart3, Menu, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./mispage.css";
 
 export default function MISPage() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleBackToMain = () => {
     console.log('Navigating back to main dashboard in same tab');
@@ -15,6 +16,15 @@ export default function MISPage() {
   const handleSidebarClick = (view) => {
     console.log('Sidebar clicked, switching to view:', view);
     setActiveView(view);
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const handleMobileNavClick = (view) => {
+    setActiveView(view);
+    setMobileMenuOpen(false);
   };
 
   const renderContent = () => {
@@ -128,11 +138,69 @@ export default function MISPage() {
             <h1>MIS<p>-</p><p>Management Information System</p>
             </h1>
           </div>
-          <button onClick={handleBackToMain} className="mis-back-btn">
-            <ArrowLeft size={16} />
-            Back to Main Dashboard
-          </button>
+          <div className="mis-page-header-right">
+            {/* Mobile Menu Toggle */}
+            <button 
+              className="mis-mobile-menu-toggle" 
+              onClick={toggleMobileMenu}
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <button onClick={handleBackToMain} className="mis-back-btn">
+              <ArrowLeft size={16} />
+              Back to Main Dashboard
+            </button>
+          </div>
         </div>
+        
+        {/* Mobile Navigation Overlay */}
+        {mobileMenuOpen && (
+          <div className="mis-mobile-nav-overlay" onClick={toggleMobileMenu}>
+            <div className="mis-mobile-nav-menu" onClick={(e) => e.stopPropagation()}>
+              <div className="mis-mobile-nav-header">
+                <h3>MIS Navigation</h3>
+                <button className="mis-mobile-nav-close" onClick={toggleMobileMenu}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="mis-mobile-nav-items">
+                <button
+                  className={`mis-mobile-nav-item ${activeView === 'dashboard' ? 'active' : ''}`}
+                  onClick={() => handleMobileNavClick('dashboard')}
+                >
+                  <Home size={20} />
+                  <span>Dashboard</span>
+                </button>
+                
+                <button
+                  className={`mis-mobile-nav-item ${activeView === 'reports' ? 'active' : ''}`}
+                  onClick={() => handleMobileNavClick('reports')}
+                >
+                  <BarChart3 size={20} />
+                  <span>Reports</span>
+                </button>
+                
+                <button
+                  className={`mis-mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
+                  onClick={() => handleMobileNavClick('users')}
+                >
+                  <Users size={20} />
+                  <span>Users</span>
+                </button>
+                
+                <button
+                  className={`mis-mobile-nav-item ${activeView === 'settings' ? 'active' : ''}`}
+                  onClick={() => handleMobileNavClick('settings')}
+                >
+                  <Settings size={20} />
+                  <span>Settings</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
         {renderContent()}
       </div>
