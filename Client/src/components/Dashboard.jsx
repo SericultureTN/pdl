@@ -39,21 +39,44 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || 'https://pdltn.vercel.app/api';
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+        const FALLBACK_API = 'https://pdltn.vercel.app/api';
+        const FINAL_API = API_BASE || FALLBACK_API;
+        
+        console.log('Dashboard fetching from:', FINAL_API);
+        
         const [dashboardRes, statsRes] = await Promise.all([
-          fetch(`${API_BASE}/admin/dashboard`, {
+          fetch(`${FINAL_API}/admin/dashboard`, {
             credentials: "include",
+            headers: {
+              'Content-Type': 'application/json'
+            }
           }),
           sericulturistService.getStatistics()
         ]);
         
         const dashboard = await dashboardRes.json();
+        console.log('Dashboard data:', dashboard);
+        
         if (dashboard.ok) {
           setDashboardData(dashboard);
           setStatistics(dashboard.statistics || statsRes.statistics);
+        } else {
+          console.error('Dashboard data not ok:', dashboard);
         }
       } catch (err) {
-        console.error(err);
+        console.error('Dashboard fetch error:', err);
+        // Set default data if API fails
+        setDashboardData({
+          ok: true,
+          message: 'Dashboard loaded with default data',
+          statistics: {
+            totalUsers: 0,
+            activeUsers: 0,
+            totalSericulturists: 0,
+            activeSericulturists: 0
+          }
+        });
       } finally {
         setLoading(false);
       }

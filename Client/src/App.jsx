@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import MISPage from './pages/MISPage.jsx';
@@ -12,6 +12,7 @@ import './App.css';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -19,37 +20,41 @@ function App() {
         console.log('Checking authentication...');
         const result = await authService.getCurrentUser();
         console.log('Auth result:', result);
-        if (result.ok) {
+        if (result.ok && result.user) {
           setUser(result.user);
+        } else {
+          console.log('No valid user session found');
         }
       } catch (error) {
-        console.log('Not authenticated:', error);
+        console.log('Not authenticated:', error.message);
+        // Don't throw error, just continue to login
       } finally {
         setLoading(false);
+        setAuthChecked(true);
       }
     };
 
-    // Add timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      console.log('Auth check timeout - forcing loading to false');
-      setLoading(false);
-    }, 5000);
-
-    checkAuth().then(() => {
-      clearTimeout(timeout);
-    });
-
-    return () => clearTimeout(timeout);
+    checkAuth();
   }, []);
 
   const handleLogin = (userData) => {
+    console.log('User logged in:', userData);
     setUser(userData);
   };
 
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      console.log('User logged out');
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still logout locally even if API call fails
+      setUser(null);
+    }
   };
 
+  // Show loading only during initial auth check
   if (loading) {
     return (
       <div className="loading-container">
@@ -58,16 +63,22 @@ function App() {
     );
   }
 
-  return user ? (
+  // If not authenticated, show login
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  // If authenticated, show routes
+  return (
     <Routes>
       <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/mis-dashboard" element={<MISPage />} />
       <Route path="/pls-dashboard" element={<PLSPage />} />
       <Route path="/prc-dashboard" element={<PRCPage />} />
       <Route path="/poc-dashboard" element={<POCPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  ) : (
-    <Login onLogin={handleLogin} />
   );
 }
 

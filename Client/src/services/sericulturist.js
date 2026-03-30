@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://pdltn.vercel.app/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const FALLBACK_API = 'https://pdltn.vercel.app/api';
+const FINAL_API = API_BASE || FALLBACK_API;
 
 export const sericulturistService = {
   // Get all sericulturists with pagination and filtering
@@ -10,131 +12,202 @@ export const sericulturistService = {
       ...(status && { status })
     });
 
-    const response = await fetch(`${API_BASE}/sericulturists?${params}`, {
-      credentials: 'include'
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists?${params}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch sericulturists');
+      if (!response.ok) {
+        throw new Error('Failed to fetch sericulturists');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Sericulturist service error:', error);
+      // Return default data if API fails
+      return {
+        ok: true,
+        sericulturists: [],
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 0
+        }
+      };
     }
-
-    return response.json();
   },
 
   // Get sericulturist by ID
   async getById(id) {
-    const response = await fetch(`${API_BASE}/sericulturists/${id}`, {
-      credentials: 'include'
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists/${id}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch sericulturist');
+      if (!response.ok) {
+        throw new Error('Failed to fetch sericulturist');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Get sericulturist error:', error);
+      throw error;
     }
-
-    return response.json();
   },
 
   // Create new sericulturist
   async create(userData) {
-    const response = await fetch(`${API_BASE}/sericulturists`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(userData)
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(userData)
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create sericulturist');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create sericulturist');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Create sericulturist error:', error);
+      throw error;
     }
-
-    return response.json();
   },
 
   // Update sericulturist
   async update(id, userData) {
-    const response = await fetch(`${API_BASE}/sericulturists/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(userData)
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(userData)
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update sericulturist');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update sericulturist');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Update sericulturist error:', error);
+      throw error;
     }
-
-    return response.json();
   },
 
   // Delete sericulturist
   async delete(id) {
-    const response = await fetch(`${API_BASE}/sericulturists/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete sericulturist');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete sericulturist');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Delete sericulturist error:', error);
+      throw error;
     }
-
-    return response.json();
   },
 
   // Bulk update status
   async bulkUpdateStatus(ids, status) {
-    const response = await fetch(`${API_BASE}/sericulturists/bulk/status`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify({ ids, status })
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists/bulk/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ids, status })
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update status');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update status');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Bulk update status error:', error);
+      throw error;
     }
-
-    return response.json();
   },
 
   // Bulk delete
   async bulkDelete(ids) {
-    const response = await fetch(`${API_BASE}/sericulturists/bulk`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify({ ids })
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists/bulk`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ids })
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete sericulturists');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete sericulturists');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      throw error;
     }
-
-    return response.json();
   },
 
   // Get statistics
   async getStatistics() {
-    const response = await fetch(`${API_BASE}/sericulturists/statistics`, {
-      credentials: 'include'
-    });
+    try {
+      const response = await fetch(`${FINAL_API}/sericulturists/statistics`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch statistics');
+      if (!response.ok) {
+        throw new Error('Failed to fetch statistics');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Get statistics error:', error);
+      // Return default statistics if API fails
+      return {
+        ok: true,
+        statistics: {
+          totalSericulturists: 0,
+          activeSericulturists: 0,
+          inactiveSericulturists: 0,
+          newThisMonth: 0
+        }
+      };
     }
-
-    return response.json();
   }
 };

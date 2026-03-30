@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, Home, Users, Settings, BarChart3, ArrowLeft } from "lucide-react";
+import { Package, Home, Users, Settings, BarChart3, ArrowLeft, FileText, Menu, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./plspage.css";
 
