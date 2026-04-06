@@ -196,15 +196,13 @@ export default function Dashboard({ user, onLogout }) {
                 <span>Overview</span>
               </button>
               
-              {user.role === 'admin' && (
-                <button
-                  className={`mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
-                  onClick={() => handleMobileNavClick('users')}
-                >
-                  <Users size={20} />
-                  <span>Users</span>
-                </button>
-              )}
+              <button
+                className={`mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
+                onClick={() => handleMobileNavClick('users')}
+              >
+                <Users size={20} />
+                <span>Users</span>
+              </button>
               
               <div className="mobile-nav-section">
                 <h4>Sections</h4>
@@ -241,15 +239,13 @@ export default function Dashboard({ user, onLogout }) {
           Overview
         </button>
         
-        {user.role === 'admin' && (
-          <button
-            className={`nav-btn ${activeView === 'users' ? 'active' : ''}`}
-            onClick={() => setActiveView('users')}
-          >
-            <Users size={16} />
-            Users
-          </button>
-        )}
+        <button
+          className={`nav-btn ${activeView === 'users' ? 'active' : ''}`}
+          onClick={() => setActiveView('users')}
+        >
+          <Users size={16} />
+          Users
+        </button>
         
         <div 
           className="nav-dropdown-wrapper"
@@ -260,7 +256,7 @@ export default function Dashboard({ user, onLogout }) {
             className={`nav-btn ${activeView === 'ad-offices' ? 'active' : ''}`}
           >
             <Building2 size={16} />
-            {user.role === 'admin' ? 'Sections' : 'My Section'}
+            Sections
             <ChevronDown size={14} className="dropdown-arrow" />
           </button>
           
