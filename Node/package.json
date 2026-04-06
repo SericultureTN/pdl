@@ -7,8 +7,10 @@
   "scripts": {
     "dev": "node --watch src/index-simple.js",
     "dev-postgres": "node --watch src/index-postgres.js",
+    "dev-sqlite": "node --watch src/index-sqlite.js",
     "start": "node src/index-simple.js",
     "start-postgres": "node src/index-postgres.js",
+    "start-sqlite": "node src/index-sqlite.js",
     "build": "echo 'Build completed'"
   },
   "dependencies": {
@@ -21,6 +23,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6"
   }
 }
