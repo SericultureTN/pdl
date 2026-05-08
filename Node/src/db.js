@@ -11,7 +11,7 @@ const DB_PATH = process.env.DATABASE_PATH || "./data/app.db";
 ensureDirForFile(DB_PATH);
 
 export const db = new Database(DB_PATH);
-
+  
 db.pragma("journal_mode = WAL");
 
 db.exec(`

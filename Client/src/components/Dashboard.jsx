@@ -39,9 +39,9 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        // Local API URL only
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-        const FALLBACK_API = 'https://pdltn.vercel.app/api';
-        const FINAL_API = API_BASE || FALLBACK_API;
+        const FINAL_API = API_BASE;
         
         console.log('Dashboard fetching from:', FINAL_API);
         
@@ -327,35 +327,28 @@ export default function Dashboard({ user, onLogout }) {
               <StatCard
                 icon={<Users size={24} />}
                 title="Total Users"
-                value={statistics?.total || 0}
-                subtitle="Registered sericulturists"
+                value={statistics?.totalUsers || 0}
+                subtitle="Registered users"
                 color="blue"
               />
               
               <StatCard
                 icon={<UserCheck size={24} />}
                 title="Active Users"
-                value={statistics?.active || 0}
-                subtitle={`${statistics?.activePercentage || 0}% of total`}
+                value={statistics?.activeUsers || 0}
+                subtitle={`${Math.round((statistics?.activeUsers || 0) / (statistics?.totalUsers || 1) * 100)}% of total`}
                 color="green"
               />
               
               <StatCard
                 icon={<UserX size={24} />}
                 title="Inactive Users"
-                value={statistics?.inactive || 0}
+                value={statistics?.inactiveUsers || 0}
                 subtitle="Need attention"
                 color="orange"
               />
               
-              <StatCard
-                icon={<TrendingUp size={24} />}
-                title="New This Month"
-                value={statistics?.recentGrowth || 0}
-                subtitle="Last 30 days"
-                color="purple"
-              />
-            </div>
+              </div>
 
             <div className="dashboard-cards">
               <div className="card">

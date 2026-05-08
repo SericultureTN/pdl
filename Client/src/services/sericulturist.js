@@ -1,6 +1,6 @@
+// Local API URL only
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-const FALLBACK_API = 'https://pdltn.vercel.app/api';
-const FINAL_API = API_BASE || FALLBACK_API;
+const FINAL_API = API_BASE;
 
 export const sericulturistService = {
   // Get all sericulturists with pagination and filtering
