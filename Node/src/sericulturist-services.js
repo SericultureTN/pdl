@@ -119,6 +119,67 @@ export const sericulturistServices = {
     }
   },
 
+  // Get all sericulturists with role-based AD office filtering
+  async getAllWithFilter(page = 1, limit = 10, search = '', status = '', adOfficeWhere = '', adOfficeParams = []) {
+    try {
+      const offset = (page - 1) * limit;
+      let whereClause = 'WHERE 1=1';
+      const params = [...adOfficeParams];
+      let paramCount = adOfficeParams.length;
+
+      // Add AD office filter if provided
+      if (adOfficeWhere) {
+        whereClause = adOfficeWhere;
+        // Adjust parameter placeholders
+        paramCount = adOfficeParams.length;
+      }
+
+      if (search) {
+        paramCount++;
+        whereClause += ` AND (name ILIKE $${paramCount} OR email ILIKE $${paramCount} OR phone ILIKE $${paramCount})`;
+        params.push(`%${search}%`);
+      }
+
+      if (status) {
+        paramCount++;
+        whereClause += ` AND status = $${paramCount}`;
+        params.push(status);
+      }
+
+      // Get total count
+      const countResult = await query(`
+        SELECT COUNT(*) as total FROM sericulturists ${whereClause}
+      `, params);
+
+      // Get sericulturists
+      const sericulturistsResult = await query(`
+        SELECT id, name, email, phone, address, role, ad_office, status, 
+               created_at, updated_at
+        FROM sericulturists 
+        ${whereClause}
+        ORDER BY created_at DESC 
+        LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+      `, [...params, limit, offset]);
+
+      const total = parseInt(countResult.rows[0].total);
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        ok: true,
+        sericulturists: sericulturistsResult.rows,
+        pagination: {
+          current: page,
+          total: totalPages,
+          limit,
+          totalItems: total
+        }
+      };
+    } catch (error) {
+      console.error('Get sericulturists with filter error:', error);
+      return { ok: false, error: 'Failed to fetch sericulturists' };
+    }
+  },
+
   // Get sericulturist by ID
   async getById(id) {
     try {

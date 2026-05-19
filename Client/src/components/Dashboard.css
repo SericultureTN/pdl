@@ -6,14 +6,15 @@
 }
 
 .dashboard-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* background: linear-gradient(135deg, #1caca5 0%, #764ba2 100%); */
+  background: linear-gradient(135deg, #764ba2 0%, #1caca5 100%);
   color: white;
-  padding: 0;
+  padding:0;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
-  display: flex;
+  display: flex;  
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 2rem;
@@ -55,17 +56,28 @@
   justify-content: flex-end;
 }
 
+/* User Menu Dropdown */
+.user-menu-wrapper {
+  position: relative;
+  cursor: pointer;
+}
+
 .user-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 0.5rem;
   backdrop-filter: blur(10px);
   min-height: 44px;
   align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-info:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .user-info span {
@@ -75,26 +87,112 @@
   color: rgba(255, 255, 255, 0.95);
 }
 
-.logout-btn {
+.user-info-text {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 0.5rem;
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 44px;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
 }
 
-.logout-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
+.user-email {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.user-ad-office {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-top: 0.125rem;
+}
+
+.user-info .dropdown-arrow {
+  color: rgba(255, 255, 255, 0.7);
+  transition: transform 0.2s ease;
+  margin-left: 0.25rem;
+}
+
+.user-info .dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* User Dropdown Menu */
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownSlide 0.2s ease-out;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-dropdown .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: none;
+  border: none;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.user-dropdown .dropdown-item:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.user-dropdown .dropdown-item svg {
+  color: #6b7280;
+  width: 18px;
+  height: 18px;
+}
+
+.user-dropdown .dropdown-item:hover svg {
+  color: #667eea;
+}
+
+.user-dropdown .logout-item {
+  color: #dc2626;
+}
+
+.user-dropdown .logout-item:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.user-dropdown .logout-item svg {
+  color: #dc2626;
+}
+
+.user-dropdown .dropdown-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0.25rem 0;
 }
 
 .dashboard-nav {
@@ -536,12 +634,7 @@
     padding: 0.5rem 1rem;
     min-width: auto;
   }
-  
-  .logout-btn {
-    padding: 0.5rem 1.25rem;
-    font-size: 0.85rem;
-  }
-  
+
   .dashboard-nav {
     padding: 0 1rem;
     overflow-x: auto;
@@ -688,12 +781,7 @@
   .user-info span {
     display: none;
   }
-  
-  .logout-btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.8rem;
-  }
-  
+
   .mobile-menu-toggle {
     top: 0.5rem;
     right: 0.5rem;
@@ -853,11 +941,6 @@
     padding: 0.4rem 0.75rem;
   }
   
-  .logout-btn {
-    padding: 0.4rem 0.75rem;
-    font-size: 0.75rem;
-  }
-  
   .dashboard-main {
     padding: 0.5rem;
   }
@@ -908,14 +991,7 @@
     transform: scale(0.98);
   }
   
-  .logout-btn:hover {
-    background: rgba(255, 255, 255, 0.25);
   }
-  
-  .logout-btn:active {
-    background: rgba(255, 255, 255, 0.3);
-  }
-}
 
 /* Navigation Dropdown Styles */
 .nav-dropdown-wrapper {
@@ -928,7 +1004,7 @@
   transition: transform 0.2s ease;
 }
 
-.nav-dropdown-wrapper:hover .dropdown-arrow {
+.dropdown-arrow.open {
   transform: rotate(180deg);
 }
 

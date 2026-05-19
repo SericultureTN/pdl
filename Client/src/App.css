@@ -1,16 +1,64 @@
 /* App.css - Custom styles for App component */
 
+/* CSS Variables for theming */
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+  --card-bg: #ffffff;
+  --card-header-bg: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Dark mode variables */
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border-color: #334155;
+  --card-bg: #1e293b;
+  --card-header-bg: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --input-bg: #334155;
+  --input-border: #475569;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Auto theme (follows system preference) */
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --card-bg: #1e293b;
+    --card-header-bg: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    --input-bg: #334155;
+    --input-border: #475569;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  }
+}
+
 .loading-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--bg-primary);
 }
 
 .loading-text {
   font-size: 1.125rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 /* Additional custom styles can be added here */

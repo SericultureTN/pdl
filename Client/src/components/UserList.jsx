@@ -4,7 +4,7 @@ import { sericulturistService } from '../services/sericulturist.js';
 import UserForm from './UserForm.jsx';
 import './UserList.css';
 
-export default function UserList() {
+export default function UserList({ userRole, userAdOffice, canDelete }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -159,10 +159,12 @@ export default function UserList() {
           </span>
         </div>
         
-        <button onClick={handleCreateUser} className="btn btn-primary">
-          <Plus size={16} />
-          Add User
-        </button>
+        {(userRole === 'super_admin' || userRole === 'section_admin') && (
+          <button onClick={handleCreateUser} className="btn btn-primary">
+            <Plus size={16} />
+            Add User
+          </button>
+        )}
       </div>
 
       <div className="user-list-filters">
@@ -213,13 +215,15 @@ export default function UserList() {
               <UserX size={14} />
               Mark Inactive
             </button>
-            <button
-              onClick={handleBulkDelete}
-              className="btn btn-sm btn-danger"
-            >
-              <Trash2 size={14} />
-              Delete
-            </button>
+            {canDelete && (
+              <button
+                onClick={handleBulkDelete}
+                className="btn btn-sm btn-danger"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -239,7 +243,7 @@ export default function UserList() {
               <th>Email</th>
               <th>Phone</th>
               <th>Role</th>
-              <th>Section</th>
+              <th>AD Office</th>
               <th>Status</th>
               <th>Joined</th>
               <th>Actions</th>
@@ -278,13 +282,15 @@ export default function UserList() {
                     >
                       <Edit2 size={14} />
                     </button>
-                    <button
-                      onClick={() => handleDeleteUser(user)}
-                      className="btn-icon btn-delete"
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeleteUser(user)}
+                        className="btn-icon btn-delete"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -337,6 +343,8 @@ export default function UserList() {
           onClose={() => setShowForm(false)}
           onSave={handleSaveUser}
           mode={editingUser ? 'edit' : 'create'}
+          userRole={userRole}
+          userAdOffice={userAdOffice}
         />
       )}
     </div>

@@ -5,7 +5,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // PostgreSQL connection configuration
-const dbUrl = process.env.DATABASE_URL;
+const dbUser = process.env.DB_USER || 'postgres';
+const dbPassword = process.env.DB_PASSWORD || 'postgres';
+const dbHost = process.env.DB_HOST || 'localhost';
+const dbPort = process.env.DB_PORT || '5432';
+const dbName = process.env.DB_NAME || 'pdl_local';
+const dbUrl = process.env.DATABASE_URL || `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
 console.log('Database URL:', dbUrl);
 
 const pool = new Pool({
@@ -40,10 +45,24 @@ export const initializeDatabase = async () => {
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'super_admin',
+        name VARCHAR(255),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Add role column if it doesn't exist (migration)
+    try {
+      await client.query(`
+        ALTER TABLE admins ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'super_admin';
+      `);
+      await client.query(`
+        ALTER TABLE admins ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+      `);
+    } catch (err) {
+      console.log('ℹ️ Role/name columns might already exist');
+    }
 
     // Create updated_at trigger
     await client.query(`

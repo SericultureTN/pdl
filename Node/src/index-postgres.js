@@ -8,7 +8,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { testConnection, initializeDatabase, closePool, query } from './postgres.js';
 import { sericulturistServices } from './sericulturist-services.js';
-import { authServices } from './auth-postgres.js';
+import { authServices, initializeDefaultAdmin } from './auth-postgres.js';
 
 const app = express();
 
@@ -105,7 +105,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // First try admin login
+    // First try admin login (Super Admin)
     console.log('Trying admin login for:', email);
     const adminResult = await query(
       "SELECT * FROM admins WHERE email = $1",
@@ -121,8 +121,17 @@ app.post("/api/login", async (req, res) => {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Check if admin has a specific role, default to super_admin
+      const adminRole = admin.role || 'super_admin';
+
       const token = jwt.sign(
-        { id: admin.id, email: admin.email, role: 'admin', name: 'Administrator' },
+        { 
+          id: admin.id, 
+          email: admin.email, 
+          role: adminRole, 
+          name: admin.name || 'Super Administrator',
+          ad_office: null // Super admin has access to all AD offices
+        },
         process.env.JWT_SECRET || "dev_secret_change_me",
         { expiresIn: "24h" }
       );
@@ -139,26 +148,36 @@ app.post("/api/login", async (req, res) => {
         user: {
           id: admin.id,
           email: admin.email,
-          role: 'admin',
-          name: 'Administrator'
+          role: adminRole,
+          name: admin.name || 'Super Administrator',
+          ad_office: null
         }
       });
     }
 
     console.log('Admin not found, trying sericulturist login');
 
-    // Try sericulturist login
+    // Try sericulturist login (Section Admin or User)
     try {
       const sericulturistResult = await sericulturistServices.login(email, password);
 
       if (sericulturistResult.ok) {
+        const sericulturist = sericulturistResult.sericulturist;
+        
+        // Map sericulturist role to new role system
+        // section_admin or user
+        let userRole = 'user';
+        if (sericulturist.role === 'section_admin' || sericulturist.role === 'admin') {
+          userRole = 'section_admin';
+        }
+
         const token = jwt.sign(
           { 
-            id: sericulturistResult.sericulturist.id, 
-            email: sericulturistResult.sericulturist.email, 
-            role: 'sericulturist',
-            ad_office: sericulturistResult.sericulturist.ad_office,
-            name: sericulturistResult.sericulturist.name
+            id: sericulturist.id, 
+            email: sericulturist.email, 
+            role: userRole,
+            ad_office: sericulturist.ad_office,
+            name: sericulturist.name
           },
           process.env.JWT_SECRET || "dev_secret_change_me",
           { expiresIn: "24h" }
@@ -174,11 +193,11 @@ app.post("/api/login", async (req, res) => {
         return res.json({
           ok: true,
           user: {
-            id: sericulturistResult.sericulturist.id,
-            email: sericulturistResult.sericulturist.email,
-            role: 'sericulturist',
-            name: sericulturistResult.sericulturist.name,
-            ad_office: sericulturistResult.sericulturist.ad_office
+            id: sericulturist.id,
+            email: sericulturist.email,
+            role: userRole,
+            name: sericulturist.name,
+            ad_office: sericulturist.ad_office
           }
         });
       }
@@ -246,18 +265,72 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
-// Admin middleware
-const requireAdmin = async (req, res, next) => {
+// Role-based middleware helpers
+const ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  SECTION_ADMIN: 'section_admin',
+  USER: 'user'
+};
+
+// Require Super Admin
+const requireSuperAdmin = async (req, res, next) => {
   try {
     await requireAuth(req, res, () => {
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ error: "Admin access required" });
+      if (req.user.role !== ROLES.SUPER_ADMIN) {
+        return res.status(403).json({ error: "Super Admin access required" });
       }
       next();
     });
   } catch (error) {
     return res.status(401).json({ error: "Authentication failed" });
   }
+};
+
+// Require Section Admin or higher
+const requireSectionAdmin = async (req, res, next) => {
+  try {
+    await requireAuth(req, res, () => {
+      if (req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.SECTION_ADMIN) {
+        return res.status(403).json({ error: "Section Admin access required" });
+      }
+      next();
+    });
+  } catch (error) {
+    return res.status(401).json({ error: "Authentication failed" });
+  }
+};
+
+// Require any authenticated user
+const requireAnyUser = async (req, res, next) => {
+  try {
+    await requireAuth(req, res, () => {
+      // Any authenticated user can proceed
+      next();
+    });
+  } catch (error) {
+    return res.status(401).json({ error: "Authentication failed" });
+  }
+};
+
+// Build AD Office filter for queries
+const buildADOfficeFilter = (user, tableAlias = '') => {
+  const prefix = tableAlias ? `${tableAlias}.` : '';
+  
+  // Super admin sees all data
+  if (user.role === ROLES.SUPER_ADMIN) {
+    return { whereClause: '', params: [] };
+  }
+  
+  // Section admin and regular user only see their AD office data
+  if (user.ad_office) {
+    return { 
+      whereClause: `WHERE ${prefix}ad_office = $1`, 
+      params: [user.ad_office] 
+    };
+  }
+  
+  // Fallback - no data access
+  return { whereClause: 'WHERE 1=0', params: [] };
 };
 
 // Get current user info
@@ -275,11 +348,11 @@ app.get("/api/me", requireAuth, (req, res) => {
 });
 
 // Admin specific routes
-app.get("/api/admin/me", requireAdmin, (req, res) => {
-  return res.json({ ok: true, admin: req.admin });
+app.get("/api/admin/me", requireSuperAdmin, (req, res) => {
+  return res.json({ ok: true, admin: req.user });
 });
 
-app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
+app.get("/api/admin/dashboard", requireSuperAdmin, async (req, res) => {
   try {
     const [statsResult] = await Promise.all([
       sericulturistServices.getStatistics()
@@ -287,8 +360,8 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
 
     return res.json({
       ok: true,
-      message: `Welcome, ${req.admin.email}!`,
-      admin: req.admin,
+      message: `Welcome, ${req.user.email}!`,
+      admin: req.user,
       serverTime: new Date().toISOString(),
       statistics: statsResult.ok ? statsResult.statistics : null
     });
@@ -299,14 +372,18 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
 });
 
 // Sericulturist Management Routes
-app.get("/api/sericulturists", requireAdmin, async (req, res) => {
+// Get all sericulturists - filtered by AD office for non-super-admin users
+app.get("/api/sericulturists", requireAnyUser, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || '';
     const status = req.query.status || '';
 
-    const result = await sericulturistServices.getAll(page, limit, search, status);
+    // Build AD office filter
+    const { whereClause, params } = buildADOfficeFilter(req.user, 's');
+
+    const result = await sericulturistServices.getAllWithFilter(page, limit, search, status, whereClause, params);
     
     if (!result.ok) {
       return res.status(500).json({ error: result.error });
@@ -319,7 +396,7 @@ app.get("/api/sericulturists", requireAdmin, async (req, res) => {
   }
 });
 
-app.get("/api/sericulturists/:id", requireAdmin, async (req, res) => {
+app.get("/api/sericulturists/:id", requireAnyUser, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -332,6 +409,12 @@ app.get("/api/sericulturists/:id", requireAdmin, async (req, res) => {
       return res.status(404).json({ error: result.error });
     }
 
+    // Check if user has access to this sericulturist's AD office
+    if (req.user.role !== ROLES.SUPER_ADMIN && 
+        result.sericulturist.ad_office !== req.user.ad_office) {
+      return res.status(403).json({ error: "Access denied - different AD office" });
+    }
+
     return res.json({ ok: true, sericulturist: result.sericulturist });
   } catch (error) {
     console.error('Get sericulturist error:', error);
@@ -339,7 +422,7 @@ app.get("/api/sericulturists/:id", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/api/sericulturists", requireAdmin, async (req, res) => {
+app.post("/api/sericulturists", requireSectionAdmin, async (req, res) => {
   try {
     const {
       name,
@@ -356,14 +439,20 @@ app.post("/api/sericulturists", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Name and email are required" });
     }
 
+    // Section admin can only create users in their own AD office
+    let finalAdOffice = ad_office?.trim() || null;
+    if (req.user.role === ROLES.SECTION_ADMIN) {
+      finalAdOffice = req.user.ad_office;
+    }
+
     const userData = {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       password: password?.trim() || null,
       phone: phone?.trim() || null,
       address: address?.trim() || null,
-      role: role?.trim() || null,
-      ad_office: ad_office?.trim() || null,
+      role: role?.trim() || 'user',
+      ad_office: finalAdOffice,
       status: status || 'active'
     };
 
@@ -380,11 +469,22 @@ app.post("/api/sericulturists", requireAdmin, async (req, res) => {
   }
 });
 
-app.put("/api/sericulturists/:id", requireAdmin, async (req, res) => {
+app.put("/api/sericulturists/:id", requireSectionAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid sericulturist ID" });
+    }
+
+    // First check if user has access to this sericulturist
+    if (req.user.role === ROLES.SECTION_ADMIN) {
+      const existing = await sericulturistServices.getById(id);
+      if (!existing.ok) {
+        return res.status(404).json({ error: existing.error });
+      }
+      if (existing.sericulturist.ad_office !== req.user.ad_office) {
+        return res.status(403).json({ error: "Access denied - different AD office" });
+      }
     }
 
     const {
@@ -426,7 +526,7 @@ app.put("/api/sericulturists/:id", requireAdmin, async (req, res) => {
   }
 });
 
-app.delete("/api/sericulturists/:id", requireAdmin, async (req, res) => {
+app.delete("/api/sericulturists/:id", requireSuperAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -446,8 +546,8 @@ app.delete("/api/sericulturists/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// Bulk operations
-app.put("/api/sericulturists/bulk/status", requireAdmin, async (req, res) => {
+// Bulk operations - Only Super Admin
+app.put("/api/sericulturists/bulk/status", requireSuperAdmin, async (req, res) => {
   try {
     const { ids, status } = req.body;
 
@@ -475,7 +575,7 @@ app.put("/api/sericulturists/bulk/status", requireAdmin, async (req, res) => {
   }
 });
 
-app.delete("/api/sericulturists/bulk", requireAdmin, async (req, res) => {
+app.delete("/api/sericulturists/bulk", requireSuperAdmin, async (req, res) => {
   try {
     const { ids } = req.body;
 
@@ -500,7 +600,7 @@ app.delete("/api/sericulturists/bulk", requireAdmin, async (req, res) => {
 });
 
 // Statistics endpoint
-app.get("/api/sericulturists/statistics", requireAdmin, async (req, res) => {
+app.get("/api/sericulturists/statistics", requireSuperAdmin, async (req, res) => {
   try {
     const result = await sericulturistServices.getStatistics();
     
@@ -515,9 +615,9 @@ app.get("/api/sericulturists/statistics", requireAdmin, async (req, res) => {
   }
 });
 
-app.get("/api/admin/profile", requireAdmin, async (req, res) => {
+app.get("/api/admin/profile", requireSuperAdmin, async (req, res) => {
   try {
-    const result = await authServices.getAdminById(req.admin.id);
+    const result = await authServices.getAdminById(req.user.id);
     if (!result.ok) {
       return res.status(404).json({ error: result.error });
     }
@@ -528,10 +628,10 @@ app.get("/api/admin/profile", requireAdmin, async (req, res) => {
   }
 });
 
-app.put("/api/admin/password", requireAdmin, async (req, res) => {
+app.put("/api/admin/password", requireSuperAdmin, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    
+
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: "Current password and new password are required" });
     }
@@ -540,7 +640,7 @@ app.put("/api/admin/password", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "New password must be at least 6 characters" });
     }
 
-    const result = await authServices.updatePassword(req.admin.id, currentPassword, newPassword);
+    const result = await authServices.updatePassword(req.user.id, currentPassword, newPassword);
     
     if (!result.ok) {
       return res.status(400).json({ error: result.error });
@@ -554,7 +654,7 @@ app.put("/api/admin/password", requireAdmin, async (req, res) => {
 });
 
 // Super admin routes (get all admins, delete admin, etc.)
-app.get("/api/admin/admins", requireAdmin, async (req, res) => {
+app.get("/api/admin/admins", requireSuperAdmin, async (req, res) => {
   try {
     const result = await authServices.getAllAdmins();
     if (!result.ok) {
@@ -609,7 +709,10 @@ const startServer = async () => {
       console.error('❌ Failed to initialize database schema.');
       return;
     }
-    
+
+    // Initialize default admin user
+    await initializeDefaultAdmin();
+
     console.log('✅ Server ready for serverless deployment');
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -618,6 +721,13 @@ const startServer = async () => {
 
 // Initialize server for serverless
 startServer();
+
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 PostgreSQL server running on http://localhost:${PORT}`);
+    console.log(`🌐 CORS enabled for: ${CORS_ORIGIN}`);
+  });
+}
 
 // Export for Vercel serverless
 export default app;

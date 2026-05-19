@@ -9,6 +9,7 @@ import PLSDashboard from "./PLSDashboard.jsx";
 import PRCDashboard from "./PRCDashboard.jsx";
 import POCDashboard from "./POCDashboard.jsx";
 import ReportsDashboard from "./ReportsDashboard.jsx";
+import UserSettings from "./UserSettings.jsx";
 import "./Dashboard.css";
 
 const REPORT_TYPES = [
@@ -25,6 +26,26 @@ const ALL_REPORT_TYPES = [
   "POC"
 ];
 
+// Role definitions
+const ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  SECTION_ADMIN: 'section_admin',
+  USER: 'user'
+};
+
+// Role-based helper functions
+const canManageUsers = (role) => role === ROLES.SUPER_ADMIN || role === ROLES.SECTION_ADMIN;
+const canDeleteUsers = (role) => role === ROLES.SUPER_ADMIN;
+const canViewAllOffices = (role) => role === ROLES.SUPER_ADMIN;
+const getRoleDisplayName = (role) => {
+  switch (role) {
+    case ROLES.SUPER_ADMIN: return 'Super Admin';
+    case ROLES.SECTION_ADMIN: return 'Section Admin';
+    case ROLES.USER: return 'AD Office User';
+    default: return 'User';
+  }
+};
+
 export default function Dashboard({ user, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [statistics, setStatistics] = useState(null);
@@ -34,6 +55,7 @@ export default function Dashboard({ user, onLogout }) {
   const [showReportsDropdown, setShowReportsDropdown] = useState(false);
   const [selectedReport, setSelectedReport] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,8 +81,16 @@ export default function Dashboard({ user, onLogout }) {
         console.log('Dashboard data:', dashboard);
         
         if (dashboard.ok) {
+          const rawStatistics = dashboard.statistics || statsRes.statistics || {};
+          const normalizedStatistics = {
+            ...rawStatistics,
+            totalUsers: rawStatistics.totalUsers ?? rawStatistics.total ?? rawStatistics.totalSericulturists ?? 0,
+            activeUsers: rawStatistics.activeUsers ?? rawStatistics.active ?? rawStatistics.activeSericulturists ?? 0,
+            inactiveUsers: rawStatistics.inactiveUsers ?? rawStatistics.inactive ?? rawStatistics.inactiveSericulturists ?? 0,
+            recentGrowth: rawStatistics.recentGrowth ?? rawStatistics.recent ?? rawStatistics.newThisMonth ?? 0
+          };
           setDashboardData(dashboard);
-          setStatistics(dashboard.statistics || statsRes.statistics);
+          setStatistics(normalizedStatistics);
         } else {
           console.error('Dashboard data not ok:', dashboard);
         }
@@ -164,14 +194,45 @@ export default function Dashboard({ user, onLogout }) {
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             
-            <div className="user-info">
-              <User size={20} />
-              <span>{user?.email}</span>
+            {/* User Menu Dropdown - Click to open */}
+            <div className="user-menu-wrapper">
+              <div
+                className="user-info"
+                onClick={() => setShowUserMenu(!showUserMenu)}
+              >
+                <User size={20} />
+                <div className="user-info-text">
+                  <span className="user-email">{user?.email}</span>
+                  {user?.ad_office && (
+                    <span className="user-ad-office">{user.ad_office}</span>
+                  )}
+                </div>
+                <ChevronDown size={16} className={`dropdown-arrow ${showUserMenu ? 'open' : ''}`} />
+              </div>
+
+              {showUserMenu && (
+                <div className="user-dropdown">
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      setActiveView('settings');
+                      setShowUserMenu(false);
+                    }}
+                  >
+                    <Settings size={16} />
+                    Settings
+                  </button>
+                  <div className="dropdown-divider"></div>
+                  <button
+                    className="dropdown-item logout-item"
+                    onClick={handleLogout}
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
-            <button className="logout-btn" onClick={handleLogout}>
-              <LogOut size={20} />
-              Logout
-            </button>
           </div>
         </div>
       </header>
@@ -196,13 +257,15 @@ export default function Dashboard({ user, onLogout }) {
                 <span>Overview</span>
               </button>
               
-              <button
-                className={`mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
-                onClick={() => handleMobileNavClick('users')}
-              >
-                <Users size={20} />
-                <span>Users</span>
-              </button>
+              {canManageUsers(user?.role) && (
+                <button
+                  className={`mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
+                  onClick={() => handleMobileNavClick('users')}
+                >
+                  <Users size={20} />
+                  <span>Users</span>
+                </button>
+              )}
               
               <div className="mobile-nav-section">
                 <h4>Sections</h4>
@@ -225,6 +288,14 @@ export default function Dashboard({ user, onLogout }) {
                 <FileText size={20} />
                 <span>Reports</span>
               </button>
+              
+              <button
+                className={`mobile-nav-item ${activeView === 'settings' ? 'active' : ''}`}
+                onClick={() => handleMobileNavClick('settings')}
+              >
+                <Settings size={20} />
+                <span>Settings</span>
+              </button>
             </div>
           </div>
         </div>
@@ -239,27 +310,29 @@ export default function Dashboard({ user, onLogout }) {
           Overview
         </button>
         
-        <button
-          className={`nav-btn ${activeView === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveView('users')}
-        >
-          <Users size={16} />
-          Users
-        </button>
+        {canManageUsers(user?.role) && (
+          <button
+            className={`nav-btn ${activeView === 'users' ? 'active' : ''}`}
+            onClick={() => setActiveView('users')}
+          >
+            <Users size={16} />
+            Users
+          </button>
+        )}
         
-        <div 
-          className="nav-dropdown-wrapper"
-          onMouseEnter={() => setShowSectionDropdown(true)}
-          onMouseLeave={() => setShowSectionDropdown(false)}
-        >
+        <div className="nav-dropdown-wrapper">
           <button
             className={`nav-btn ${activeView === 'ad-offices' ? 'active' : ''}`}
+            onClick={() => {
+              setShowSectionDropdown(!showSectionDropdown);
+              setShowReportsDropdown(false);
+            }}
           >
             <Building2 size={16} />
             Sections
-            <ChevronDown size={14} className="dropdown-arrow" />
+            <ChevronDown size={14} className={`dropdown-arrow ${showSectionDropdown ? 'open' : ''}`} />
           </button>
-          
+
           {showSectionDropdown && (
             <div className="nav-dropdown">
               <div className="dropdown-header">
@@ -270,7 +343,10 @@ export default function Dashboard({ user, onLogout }) {
                 <button
                   key={report}
                   className="dropdown-item"
-                  onClick={() => handleReportSelect(report)}
+                  onClick={() => {
+                    handleReportSelect(report);
+                    setShowSectionDropdown(false);
+                  }}
                 >
                   {report}
                 </button>
@@ -279,15 +355,17 @@ export default function Dashboard({ user, onLogout }) {
           )}
         </div>
 
-        <div 
-          className="nav-dropdown-wrapper"
-          onMouseEnter={() => setShowReportsDropdown(true)}
-          onMouseLeave={() => setShowReportsDropdown(false)}
-        >
-          <button className={`nav-btn ${activeView === 'reports-dashboard' ? 'active' : ''}`}>
+        <div className="nav-dropdown-wrapper">
+          <button
+            className={`nav-btn ${activeView === 'reports-dashboard' ? 'active' : ''}`}
+            onClick={() => {
+              setShowReportsDropdown(!showReportsDropdown);
+              setShowSectionDropdown(false);
+            }}
+          >
             <FileText size={16} />
             Reports
-            <ChevronDown size={14} className="dropdown-arrow" />
+            <ChevronDown size={14} className={`dropdown-arrow ${showReportsDropdown ? 'open' : ''}`} />
           </button>
           
           {showReportsDropdown && (
@@ -310,7 +388,10 @@ export default function Dashboard({ user, onLogout }) {
                 <button
                   key={report}
                   className="dropdown-item"
-                  onClick={() => handleReportView(report)}
+                  onClick={() => {
+                    handleReportView(report);
+                    setShowReportsDropdown(false);
+                  }}
                 >
                   {report} Dashboard
                 </button>
@@ -318,6 +399,15 @@ export default function Dashboard({ user, onLogout }) {
             </div>
           )}
         </div>
+
+        <button
+          className={`nav-btn ${activeView === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveView('settings')}
+        >
+          <Settings size={16} />
+          Settings
+        </button>
+        
       </nav>
 
       <main className="dashboard-main">
@@ -418,9 +508,13 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        {activeView === 'users' && (
+        {activeView === 'users' && canManageUsers(user?.role) && (
           <div className="users-view">
-            <UserList />
+            <UserList 
+              userRole={user?.role} 
+              userAdOffice={user?.ad_office}
+              canDelete={canDeleteUsers(user?.role)}
+            />
           </div>
         )}
 
@@ -442,6 +536,10 @@ export default function Dashboard({ user, onLogout }) {
 
         {activeView === 'reports-dashboard' && (
           <ReportsDashboard user={user} />
+        )}
+
+        {activeView === 'settings' && (
+          <UserSettings user={user} onBack={() => setActiveView('overview')} />
         )}
       </main>
     </div>

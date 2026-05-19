@@ -30,6 +30,8 @@ export default function Login({ onLogin }) {
       const result = await authService.login(formData.email, formData.password);
       if (result.ok) {
         onLogin(result.user);
+      } else {
+        setError(result.error || 'Invalid credentials');
       }
     } catch (err) {
       setError(err.error || 'Login failed. Please try again.');

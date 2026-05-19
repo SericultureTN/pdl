@@ -3,15 +3,19 @@ import { X, User, Mail, Phone, MapPin, Calendar, CheckCircle } from 'lucide-reac
 import { sericulturistService } from '../services/sericulturist.js';
 import './UserForm.css';
 
-export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
+export default function UserForm({ user, onClose, onSave, mode = 'create', userRole, userAdOffice }) {
+  // For section_admin, auto-set AD office and disable it
+  const isSectionAdmin = userRole === 'section_admin';
+  const isSuperAdmin = userRole === 'super_admin';
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
     password: user?.password || '',
     phone: user?.phone || '',
     address: user?.address || '',
-    role: user?.role || '',
-    ad_office: user?.ad_office || '',
+    role: user?.role || (isSectionAdmin ? 'user' : ''),
+    ad_office: user?.ad_office || (isSectionAdmin ? userAdOffice : ''),
     status: user?.status || 'active'
   });
 
@@ -147,50 +151,69 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
                 <Calendar size={16} />
                 Role
               </label>
-
+              {isSuperAdmin ? (
                 <select
                   name="role"
                   value={formData.role}
                   onChange={handleChange}
                 >
                   <option value="">--Select role--</option>
-                  <option value="JIS">JIS</option>
-                  <option value="AIS">AIS</option>
-                  <option value="TA">TA</option>
+                  <option value="user">User</option>
+                  <option value="section_admin">Section Admin</option>
                 </select>
-              </div>
+              ) : (
+                <input
+                  type="text"
+                  name="role"
+                  value={formData.role || 'User'}
+                  disabled
+                  className="disabled-input"
+                />
+              )}
+            </div>
 
             <div className="form-group">
               <label>
                 <MapPin size={16} />
-                Section
+                AD Office
               </label>
-              <select
-                name="ad_office"
-                value={formData.ad_office}
-                onChange={handleChange}
-              >
-                <option value="">--Select Section--</option>
-                <option value="Hosur">Hosur</option>
-                <option value="Denkanikkottai">Denkanikkottai</option>
-                <option value="Krishnagiri">Krishnagiri</option>
-                <option value="Dharmapuri">Dharmapuri</option>
-                <option value="Pennagaram">Pennagaram</option>
-                <option value="Salem">Salem</option>
-                <option value="Coimbatore">Coimbatore</option>
-                <option value="Udumalpet">Udumalpet</option>
-                <option value="Erode">Erode</option>
-                <option value="Talavady">Talavady</option>
-                <option value="Coonoor">Coonoor</option>
-                <option value="Vaniyambadi">Vaniyambadi</option>
-                <option value="Tiruvannamalai">Tiruvannamalai</option>
-                <option value="Villuppuram">Villuppuram</option>
-                <option value="Trichy">Trichy</option>
-                <option value="Namakkal">Namakkal</option>
-                <option value="Dindigul">Dindigul</option>
-                <option value="Theni">Theni</option>
-                <option value="Tenkasi">Tenkasi</option>
-              </select>
+              {isSectionAdmin ? (
+                <input
+                  type="text"
+                  name="ad_office"
+                  value={formData.ad_office}
+                  disabled
+                  className="disabled-input"
+                  title="AD Office is fixed for Section Admin"
+                />
+              ) : (
+                <select
+                  name="ad_office"
+                  value={formData.ad_office}
+                  onChange={handleChange}
+                >
+                  <option value="">--Select Section--</option>
+                  <option value="Hosur">Hosur</option>
+                  <option value="Denkanikkottai">Denkanikkottai</option>
+                  <option value="Krishnagiri">Krishnagiri</option>
+                  <option value="Dharmapuri">Dharmapuri</option>
+                  <option value="Pennagaram">Pennagaram</option>
+                  <option value="Salem">Salem</option>
+                  <option value="Coimbatore">Coimbatore</option>
+                  <option value="Udumalpet">Udumalpet</option>
+                  <option value="Erode">Erode</option>
+                  <option value="Talavady">Talavady</option>
+                  <option value="Coonoor">Coonoor</option>
+                  <option value="Vaniyambadi">Vaniyambadi</option>
+                  <option value="Tiruvannamalai">Tiruvannamalai</option>
+                  <option value="Villuppuram">Villuppuram</option>
+                  <option value="Trichy">Trichy</option>
+                  <option value="Namakkal">Namakkal</option>
+                  <option value="Dindigul">Dindigul</option>
+                  <option value="Theni">Theni</option>
+                  <option value="Tenkasi">Tenkasi</option>
+                </select>
+              )}
             </div>
 
             <div className="form-group">

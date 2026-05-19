@@ -225,16 +225,26 @@ export const initializeDefaultAdmin = async () => {
     if (adminCount === 0) {
       const defaultEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
       const defaultPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
+      const defaultName = process.env.ADMIN_NAME || 'Super Administrator';
 
-      const registrationResult = await authServices.register(defaultEmail, defaultPassword);
-      
-      if (registrationResult.ok) {
+      // Hash password
+      const passwordHash = await bcrypt.hash(defaultPassword, SALT_ROUNDS);
+
+      // Insert admin with role and name
+      const insertResult = await query(
+        'INSERT INTO admins (email, password_hash, role, name) VALUES ($1, $2, $3, $4) RETURNING id, email',
+        [defaultEmail, passwordHash, 'super_admin', defaultName]
+      );
+
+      if (insertResult.rows.length > 0) {
         console.log(`✅ Default admin created: ${defaultEmail}`);
         console.log(`🔑 Default password: ${defaultPassword}`);
         console.log('⚠️  Please change the default password after first login!');
       } else {
-        console.error('❌ Failed to create default admin:', registrationResult.error);
+        console.error('❌ Failed to create default admin');
       }
+    } else {
+      console.log(`ℹ️ ${adminCount} admin(s) already exist, skipping default admin creation`);
     }
   } catch (error) {
     console.error('❌ Failed to initialize default admin:', error);
