@@ -4,7 +4,7 @@ import { sericulturistService } from '../services/sericulturist.js';
 import UserForm from './UserForm.jsx';
 import './UserList.css';
 
-export default function UserList({ userRole, userAdOffice, canDelete }) {
+export default function UserList({ userRole, userAdOffice, canDelete, canCreate }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,6 +25,7 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log('Fetching users with page:', pagination.current);
       const result = await sericulturistService.getAll(
         pagination.current,
         pagination.limit,
@@ -32,11 +33,22 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
         statusFilter
       );
       
+      console.log('Fetch result:', result);
+      
       if (result.ok) {
-        setUsers(result.sericulturists);
-        setPagination(result.pagination);
+        setUsers(result.sericulturists || []);
+        setPagination(prev => ({
+          ...prev,
+          current: result.pagination?.current || 1,
+          total: result.pagination?.total || 1,
+          limit: result.pagination?.limit || 10,
+          totalItems: result.pagination?.totalItems || 0
+        }));
+      } else {
+        setError(result.error || 'Failed to fetch users');
       }
     } catch (err) {
+      console.error('Fetch error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -63,9 +75,21 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
     }
 
     try {
-      await sericulturistService.delete(user.id);
+      // Convert ID to number (PostgreSQL may return it as string)
+      console.log('User object:', user);
+      console.log('Raw user.id:', user.id, 'Type:', typeof user.id);
+      const userId = Number(user.id);
+      console.log('Converted userId:', userId, 'Type:', typeof userId);
+      if (isNaN(userId)) {
+        setError('Invalid user ID');
+        return;
+      }
+      console.log('Calling delete service with ID:', userId);
+      await sericulturistService.delete(userId);
+      console.log('Delete successful, refreshing users');
       fetchUsers();
     } catch (err) {
+      console.error('Delete error:', err);
       setError(err.message);
     }
   };
@@ -77,10 +101,14 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
   };
 
   const handleSelectUser = (userId) => {
-    setSelectedUsers(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
+    // Convert to number for consistency
+    const numericId = Number(userId);
+    if (isNaN(numericId)) return;
+
+    setSelectedUsers(prev =>
+      prev.includes(numericId)
+        ? prev.filter(id => id !== numericId)
+        : [...prev, numericId]
     );
   };
 
@@ -88,19 +116,22 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
     if (selectedUsers.length === users.length) {
       setSelectedUsers([]);
     } else {
-      setSelectedUsers(users.map(user => user.id));
+      // Convert IDs to numbers for consistency
+      setSelectedUsers(users.map(user => Number(user.id)).filter(id => !isNaN(id)));
     }
   };
 
   const handleBulkStatusUpdate = async (status) => {
     if (selectedUsers.length === 0) return;
-    
+
     if (!window.confirm(`Are you sure you want to mark ${selectedUsers.length} user(s) as ${status}?`)) {
       return;
     }
 
     try {
-      await sericulturistService.bulkUpdateStatus(selectedUsers, status);
+      // Convert IDs to numbers (PostgreSQL may return them as strings)
+      const ids = selectedUsers.map(id => Number(id)).filter(id => !isNaN(id));
+      await sericulturistService.bulkUpdateStatus(ids, status);
       setSelectedUsers([]);
       fetchUsers();
     } catch (err) {
@@ -110,13 +141,16 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
 
   const handleBulkDelete = async () => {
     if (selectedUsers.length === 0) return;
-    
+
     if (!window.confirm(`Are you sure you want to delete ${selectedUsers.length} user(s)?`)) {
       return;
     }
 
     try {
-      await sericulturistService.bulkDelete(selectedUsers);
+      // Convert IDs to numbers (PostgreSQL may return them as strings)
+      const ids = selectedUsers.map(id => Number(id)).filter(id => !isNaN(id));
+      console.log('Sending bulk delete IDs:', ids);
+      await sericulturistService.bulkDelete(ids);
       setSelectedUsers([]);
       fetchUsers();
     } catch (err) {
@@ -159,7 +193,7 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
           </span>
         </div>
         
-        {(userRole === 'super_admin' || userRole === 'section_admin') && (
+        {canCreate && (
           <button onClick={handleCreateUser} className="btn btn-primary">
             <Plus size={16} />
             Add User
@@ -255,7 +289,7 @@ export default function UserList({ userRole, userAdOffice, canDelete }) {
                 <td>
                   <input
                     type="checkbox"
-                    checked={selectedUsers.includes(user.id)}
+                    checked={selectedUsers.includes(Number(user.id))}
                     onChange={() => handleSelectUser(user.id)}
                   />
                 </td>

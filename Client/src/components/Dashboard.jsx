@@ -21,9 +21,32 @@ const REPORT_TYPES = [
 
 const ALL_REPORT_TYPES = [
   "MIS",
-  "PLS", 
+  "PLS",
   "PRC",
   "POC"
+];
+
+// AD Offices for regular users
+const AD_OFFICES = [
+  "Hosur",
+  "Denkanikkottai",
+  "Krishnagiri",
+  "Dharmapuri",
+  "Pennagaram",
+  "Salem",
+  "Coimbatore",
+  "Udumalpet",
+  "Erode",
+  "Talavady",
+  "Coonoor",
+  "Vaniyambadi",
+  "Tiruvannamalai",
+  "Villuppuram",
+  "Trichy",
+  "Namakkal",
+  "Dindigul",
+  "Theni",
+  "Tenkasi"
 ];
 
 // Role definitions
@@ -36,6 +59,7 @@ const ROLES = {
 // Role-based helper functions
 const canManageUsers = (role) => role === ROLES.SUPER_ADMIN || role === ROLES.SECTION_ADMIN;
 const canDeleteUsers = (role) => role === ROLES.SUPER_ADMIN;
+const canCreateUsers = (role) => role === ROLES.SUPER_ADMIN;
 const canViewAllOffices = (role) => role === ROLES.SUPER_ADMIN;
 const getRoleDisplayName = (role) => {
   switch (role) {
@@ -203,6 +227,7 @@ export default function Dashboard({ user, onLogout }) {
                 <User size={20} />
                 <div className="user-info-text">
                   <span className="user-email">{user?.email}</span>
+                  <span className="user-role">{getRoleDisplayName(user?.role)}</span>
                   {user?.ad_office && (
                     <span className="user-ad-office">{user.ad_office}</span>
                   )}
@@ -320,6 +345,7 @@ export default function Dashboard({ user, onLogout }) {
           </button>
         )}
         
+        {/* Sections dropdown - Section Admin sees only their section, Super Admin sees all */}
         <div className="nav-dropdown-wrapper">
           <button
             className={`nav-btn ${activeView === 'ad-offices' ? 'active' : ''}`}
@@ -339,18 +365,33 @@ export default function Dashboard({ user, onLogout }) {
                 <Building2 size={16} />
                 <span>Section Reports</span>
               </div>
-              {REPORT_TYPES.map(report => (
-                <button
-                  key={report}
-                  className="dropdown-item"
-                  onClick={() => {
-                    handleReportSelect(report);
-                    setShowSectionDropdown(false);
-                  }}
-                >
-                  {report}
-                </button>
-              ))}
+              {/* Section Admin sees only their assigned section, Super Admin sees all */}
+              {user?.role === ROLES.SECTION_ADMIN ? (
+                user?.ad_office && (
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      handleReportSelect(user.ad_office);
+                      setShowSectionDropdown(false);
+                    }}
+                  >
+                    {user.ad_office}
+                  </button>
+                )
+              ) : (
+                REPORT_TYPES.map(report => (
+                  <button
+                    key={report}
+                    className="dropdown-item"
+                    onClick={() => {
+                      handleReportSelect(report);
+                      setShowSectionDropdown(false);
+                    }}
+                  >
+                    {report}
+                  </button>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -384,18 +425,35 @@ export default function Dashboard({ user, onLogout }) {
                 📊 All Reports Dashboard
               </button>
               <div className="dropdown-divider"></div>
-              {ALL_REPORT_TYPES.map(report => (
-                <button
-                  key={report}
-                  className="dropdown-item"
-                  onClick={() => {
-                    handleReportView(report);
-                    setShowReportsDropdown(false);
-                  }}
-                >
-                  {report} Dashboard
-                </button>
-              ))}
+              {/* Regular users see AD Offices, Admin users see Sections */}
+              {user?.role === ROLES.USER ? (
+                // Regular user - show their AD Office
+                user?.ad_office && (
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      handleReportSelect(user.ad_office);
+                      setShowReportsDropdown(false);
+                    }}
+                  >
+                    {user.ad_office} Office
+                  </button>
+                )
+              ) : (
+                // Super Admin and Section Admin see all reports
+                ALL_REPORT_TYPES.map(report => (
+                  <button
+                    key={report}
+                    className="dropdown-item"
+                    onClick={() => {
+                      handleReportView(report);
+                      setShowReportsDropdown(false);
+                    }}
+                  >
+                    {report} Dashboard
+                  </button>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -514,6 +572,7 @@ export default function Dashboard({ user, onLogout }) {
               userRole={user?.role} 
               userAdOffice={user?.ad_office}
               canDelete={canDeleteUsers(user?.role)}
+              canCreate={canCreateUsers(user?.role)}
             />
           </div>
         )}

@@ -100,6 +100,34 @@
   color: rgba(255, 255, 255, 0.95);
 }
 
+/* Add Entry Button */
+.btn-add-entry {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
+.btn-add-entry:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
+}
+
+.btn-add-entry.active {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+}
+
+.user-role {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(16, 185, 129, 0.8);
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-top: 0.125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
 .user-ad-office {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.7);

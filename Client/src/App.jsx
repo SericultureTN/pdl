@@ -73,10 +73,10 @@ function App() {
     <Routes>
       <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route path="/mis-dashboard" element={<MISPage />} />
-      <Route path="/pls-dashboard" element={<PLSPage />} />
-      <Route path="/prc-dashboard" element={<PRCPage />} />
-      <Route path="/poc-dashboard" element={<POCPage />} />
+      <Route path="/mis-dashboard" element={<MISPage user={user} />} />
+      <Route path="/pls-dashboard" element={<PLSPage user={user} />} />
+      <Route path="/prc-dashboard" element={<PRCPage user={user} />} />
+      <Route path="/poc-dashboard" element={<POCPage user={user} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

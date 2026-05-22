@@ -144,6 +144,7 @@ export default function MISDashboard({ user }) {
           </div>
         </div>
       </div>
+
     </div>
   );
 }

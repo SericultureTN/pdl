@@ -1,317 +1,273 @@
-import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Home, Users, Settings, BarChart3, Menu, X, Bell, Search, ChevronRight, TrendingUp, Database, Shield } from "lucide-react";
+import { useState } from "react";
+import {
+  LayoutDashboard, Database, ClipboardList, BarChart3, FileText,
+  Download, Users, Settings, LogOut, ChevronDown, ChevronRight,
+  Bell, Menu, Leaf, TrendingUp, Activity, Calendar,
+  CheckCircle2, Clock, AlertCircle
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import PlantationOverall from "../components/mis/PlantationOverall.jsx";
+import PlantationScheme from "../components/mis/PlantationScheme.jsx";
+import DFLsDistribution from "../components/mis/DFLsDistribution.jsx";
+import DFLsConsumption from "../components/mis/DFLsConsumption.jsx";
+import CocoonProduction from "../components/mis/CocoonProduction.jsx";
 import "./mispage.css";
 
-export default function MISPage() {
+const NAV_ITEMS = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "master", label: "Master", icon: Database },
+  {
+    id: "data-entry", label: "Data Entry", icon: ClipboardList,
+    children: [
+      { id: "plantation-overall", label: "Plantation Overall" },
+      { id: "plantation-2024", label: "Plantation Scheme 2024–25" },
+      { id: "plantation-2025", label: "Plantation Scheme 2025–26" },
+      { id: "dfls-distribution", label: "DFLs Distribution" },
+      { id: "dfls-consumption", label: "DFLs Consumption" },
+      { id: "cocoon-production", label: "Cocoon Production" },
+    ]
+  },
+  { id: "reports", label: "Reports", icon: BarChart3 },
+  { id: "mis-reports", label: "MIS Reports", icon: FileText },
+  { id: "downloads", label: "Downloads", icon: Download },
+  { id: "users", label: "User Management", icon: Users },
+  { id: "settings", label: "Settings", icon: Settings },
+];
+
+const FINANCIAL_YEARS = ["2025–26", "2024–25", "2023–24", "2022–23"];
+
+export default function MISPage({ user }) {
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState('dashboard');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeView, setActiveView] = useState("dashboard");
+  const [dataEntryOpen, setDataEntryOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedYear, setSelectedYear] = useState("2025–26");
 
-  const handleBackToMain = () => {
-    console.log('Navigating back to main dashboard in same tab');
-    navigate('/');
+  const breadcrumbLabel = () => {
+    const flat = NAV_ITEMS.flatMap(n => n.children ? [n, ...n.children] : [n]);
+    return flat.find(n => n.id === activeView)?.label || "Dashboard";
   };
 
-  const handleSidebarClick = (view) => {
-    console.log('Sidebar clicked, switching to view:', view);
-    setActiveView(view);
+  const handleNav = (id, hasChildren) => {
+    if (hasChildren) { setDataEntryOpen(o => !o); return; }
+    setActiveView(id);
+    if (!NAV_ITEMS.find(n => n.id === "data-entry")?.children?.find(c => c.id === id)) {
+      setDataEntryOpen(false);
+    }
   };
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  const handleMobileNavClick = (view) => {
-    setActiveView(view);
-    setMobileMenuOpen(false);
-  };
-
-  const stats = [
-    { icon: <Database size={24} />, label: 'Total Records', value: '12,450', trend: '+12%' },
-    { icon: <Users size={24} />, label: 'Active Users', value: '1,234', trend: '+5%' },
-    { icon: <FileText size={24} />, label: 'Reports Generated', value: '856', trend: '+18%' },
-    { icon: <TrendingUp size={24} />, label: 'Growth Rate', value: '23.5%', trend: '+8%' }
-  ];
-
-  const recentActivities = [
-    { title: 'Monthly Report Generated', time: '2 hours ago', type: 'report' },
-    { title: 'New User Added', time: '4 hours ago', type: 'user' },
-    { title: 'Data Backup Completed', time: '6 hours ago', type: 'system' },
-    { title: 'Security Audit Passed', time: '1 day ago', type: 'security' }
-  ];
+  const isDataEntryChild = NAV_ITEMS.find(n => n.id === "data-entry")
+    ?.children?.some(c => c.id === activeView);
 
   const renderContent = () => {
-    switch(activeView) {
-      case 'dashboard':
-        return (
-          <div className="mis-dashboard-content">
-            {/* Stats Cards */}
-            <div className="mis-stats-grid">
-              {stats.map((stat, index) => (
-                <div key={index} className="mis-stat-card">
-                  <div className="mis-stat-icon">{stat.icon}</div>
-                  <div className="mis-stat-info">
-                    <p className="mis-stat-label">{stat.label}</p>
-                    <h3 className="mis-stat-value">{stat.value}</h3>
-                    <span className="mis-stat-trend">{stat.trend}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Main Content Area */}
-            <div className="mis-content-grid">
-              <div className="mis-main-card">
-                <div className="mis-card-header">
-                  <h3>Welcome to MIS Dashboard</h3>
-                  <p>Management Information System Overview</p>
-                </div>
-                <div className="mis-card-body">
-                  <div className="mis-welcome-section">
-                    <div className="mis-welcome-icon">
-                      <BarChart3 size={48} />
-                    </div>
-                    <h2>System Overview</h2>
-                    <p>Access comprehensive reports, manage users, and configure system settings from your centralized dashboard.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mis-side-cards">
-                <div className="mis-side-card">
-                  <h4>Recent Activity</h4>
-                  <ul className="mis-activity-list">
-                    {recentActivities.map((activity, index) => (
-                      <li key={index} className={`mis-activity-item ${activity.type}`}>
-                        <span className="mis-activity-dot"></span>
-                        <div>
-                          <p>{activity.title}</p>
-                          <span>{activity.time}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="mis-side-card mis-quick-actions">
-                  <h4>Quick Actions</h4>
-                  <div className="mis-action-buttons">
-                    <button className="mis-action-btn" onClick={() => setActiveView('reports')}>
-                      <FileText size={18} />
-                      Generate Report
-                    </button>
-                    <button className="mis-action-btn" onClick={() => setActiveView('users')}>
-                      <Users size={18} />
-                      Manage Users
-                    </button>
-                    <button className="mis-action-btn" onClick={() => setActiveView('settings')}>
-                      <Settings size={18} />
-                      Settings
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      case 'reports':
-        return (
-          <div className="mis-page-content">
-            <div className="mis-page-header-card">
-              <h2><FileText size={28} /> MIS Reports</h2>
-              <p>Generate and manage system reports</p>
-            </div>
-            <div className="mis-placeholder-content">
-              <FileText size={64} className="mis-placeholder-icon" />
-              <h3>Reports Section</h3>
-              <p>Report generation interface coming soon</p>
-            </div>
-          </div>
-        );
-      case 'users':
-        return (
-          <div className="mis-page-content">
-            <div className="mis-page-header-card">
-              <h2><Users size={28} /> User Management</h2>
-              <p>Manage system users and permissions</p>
-            </div>
-            <div className="mis-placeholder-content">
-              <Users size={64} className="mis-placeholder-icon" />
-              <h3>Users Section</h3>
-              <p>User management interface coming soon</p>
-            </div>
-          </div>
-        );
-      case 'settings':
-        return (
-          <div className="mis-page-content">
-            <div className="mis-page-header-card">
-              <h2><Settings size={28} /> System Settings</h2>
-              <p>Configure MIS system preferences</p>
-            </div>
-            <div className="mis-placeholder-content">
-              <Settings size={64} className="mis-placeholder-icon" />
-              <h3>Settings Section</h3>
-              <p>Configuration interface coming soon</p>
-            </div>
-          </div>
-        );
+    switch (activeView) {
+      case "plantation-overall": return <PlantationOverall />;
+      case "plantation-2024": return <PlantationScheme year="2024–25" />;
+      case "plantation-2025": return <PlantationScheme year="2025–26" />;
+      case "dfls-distribution": return <DFLsDistribution />;
+      case "dfls-consumption": return <DFLsConsumption />;
+      case "cocoon-production": return <CocoonProduction />;
+      case "dashboard": return <MISDashboardOverview setActiveView={setActiveView} />;
       default:
         return (
-          <div className="mis-page-content">
-            <div className="mis-placeholder-content">
-              <BarChart3 size={64} className="mis-placeholder-icon" />
-              <h3>Select a Section</h3>
-            </div>
+          <div className="gov-placeholder">
+            <FileText size={56} />
+            <h3>{breadcrumbLabel()}</h3>
+            <p>This section is under development.</p>
           </div>
         );
     }
   };
 
   return (
-    <div className="mis-page-container">
-      {/* Modern Sidebar */}
-      <div className="mis-sidebar">
-        <div className="mis-sidebar-brand">
-          <div className="mis-brand-icon">
-            <Database size={28} />
-          </div>
-          <div className="mis-brand-text">
-            <h2>MIS</h2>
-            <span>Management Information System</span>
+    <div className={`gov-layout ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+      {/* ===== SIDEBAR ===== */}
+      <aside className="gov-sidebar">
+        <div className="gov-sidebar-brand">
+          <div className="gov-brand-logo"><Leaf size={22} /></div>
+          <div className="gov-brand-text">
+            <span className="gov-brand-title">Silk Samagra</span>
+            <span className="gov-brand-sub">MIS Portal</span>
           </div>
         </div>
 
-        <div className="mis-sidebar-nav">
-          <a 
-            href="#" 
-            className={`mis-sidebar-item ${activeView === 'dashboard' ? 'active' : ''}`}
-            onClick={(e) => {
-              e.preventDefault();
-              console.log('Dashboard sidebar item clicked');
-              handleSidebarClick('dashboard');
-            }}
-          >
-            <Home size={18} />
-            Dashboard
-          </a>
-          <a 
-            href="#" 
-            className={`mis-sidebar-item ${activeView === 'reports' ? 'active' : ''}`}
-            onClick={(e) => {
-              e.preventDefault();
-              console.log('Reports sidebar item clicked');
-              handleSidebarClick('reports');
-            }}
-          >
-            <BarChart3 size={18} />
-            Reports
-          </a>
-          <a 
-            href="#" 
-            className={`mis-sidebar-item ${activeView === 'users' ? 'active' : ''}`}
-            onClick={(e) => {
-              e.preventDefault();
-              console.log('Users sidebar item clicked');
-              handleSidebarClick('users');
-            }}
-          >
-            <Users size={18} />
-            Users
-          </a>
-          <a 
-            href="#" 
-            className={`mis-sidebar-item ${activeView === 'settings' ? 'active' : ''}`}
-            onClick={(e) => {
-              e.preventDefault();
-              console.log('Settings sidebar item clicked');
-              handleSidebarClick('settings');
-            }}
-          >
-            <Settings size={18} />
-            Settings
-          </a>
-        </div>
-      </div>
+        <nav className="gov-sidebar-nav">
+          {NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            const hasChildren = !!item.children;
+            const isActive = item.id === activeView || (hasChildren && isDataEntryChild && item.id === "data-entry");
+            const isExpanded = hasChildren && dataEntryOpen;
 
-      {/* Main Content */}
-      <div className="mis-main-content">
-        <header className="mis-top-header">
-          <div className="mis-header-left">
-            <button
-              className="mis-mobile-menu-toggle"
-              onClick={toggleMobileMenu}
-              aria-label="Toggle mobile menu"
-            >
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            return (
+              <div key={item.id}>
+                <button
+                  className={`gov-nav-item ${isActive ? "active" : ""}`}
+                  onClick={() => handleNav(item.id, hasChildren)}
+                >
+                  <Icon size={17} className="gov-nav-icon" />
+                  <span className="gov-nav-label">{item.label}</span>
+                  {hasChildren && (
+                    <span className="gov-nav-arrow">
+                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </span>
+                  )}
+                </button>
+                {hasChildren && isExpanded && (
+                  <div className="gov-nav-children">
+                    {item.children.map(child => (
+                      <button
+                        key={child.id}
+                        className={`gov-nav-child ${activeView === child.id ? "active" : ""}`}
+                        onClick={() => setActiveView(child.id)}
+                      >
+                        <span className="gov-child-dot" />
+                        {child.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <button className="gov-nav-item gov-nav-logout" onClick={() => navigate("/")}>
+            <LogOut size={17} className="gov-nav-icon" />
+            <span className="gov-nav-label">Back to Portal</span>
+          </button>
+        </nav>
+      </aside>
+
+      {/* ===== MAIN ===== */}
+      <div className="gov-main">
+        {/* Top Header */}
+        <header className="gov-header">
+          <div className="gov-header-left">
+            <button className="gov-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
+              <Menu size={20} />
             </button>
-            <div className="mis-search-bar">
-              <Search size={18} />
-              <input type="text" placeholder="Search..." />
+            <div className="gov-breadcrumb">
+              <span className="gov-bc-root">MIS Portal</span>
+              <ChevronRight size={14} />
+              {isDataEntryChild && <><span className="gov-bc-root">Data Entry</span><ChevronRight size={14} /></>}
+              <span className="gov-bc-current">{breadcrumbLabel()}</span>
             </div>
           </div>
-          <div className="mis-header-right">
-            <button className="mis-header-btn">
-              <Bell size={20} />
-              <span className="mis-notification-badge">3</span>
+          <div className="gov-header-right">
+            <div className="gov-fy-select">
+              <Calendar size={15} />
+              <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+                {FINANCIAL_YEARS.map(y => <option key={y}>{y}</option>)}
+              </select>
+            </div>
+            <button className="gov-icon-btn">
+              <Bell size={18} />
+              <span className="gov-notif-dot" />
             </button>
-            <button onClick={handleBackToMain} className="mis-back-btn">
-              <ArrowLeft size={18} />
-              <span>Back to Dashboard</span>
-            </button>
+            <div className="gov-user-chip">
+              <div className="gov-user-avatar">{user?.name?.[0] || "U"}</div>
+              <div className="gov-user-info">
+                <span className="gov-user-name">{user?.name || "User"}</span>
+                <span className="gov-user-role">{user?.role || "Officer"}</span>
+              </div>
+            </div>
           </div>
         </header>
-        
-        {/* Mobile Navigation Overlay */}
-        {mobileMenuOpen && (
-          <div className="mis-mobile-nav-overlay" onClick={toggleMobileMenu}>
-            <div className="mis-mobile-nav-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="mis-mobile-nav-header">
-                <h3>MIS Navigation</h3>
-                <button className="mis-mobile-nav-close" onClick={toggleMobileMenu}>
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="mis-mobile-nav-items">
-                <button
-                  className={`mis-mobile-nav-item ${activeView === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => handleMobileNavClick('dashboard')}
-                >
-                  <Home size={20} />
-                  <span>Dashboard</span>
-                </button>
-                
-                <button
-                  className={`mis-mobile-nav-item ${activeView === 'reports' ? 'active' : ''}`}
-                  onClick={() => handleMobileNavClick('reports')}
-                >
-                  <BarChart3 size={20} />
-                  <span>Reports</span>
-                </button>
-                
-                <button
-                  className={`mis-mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
-                  onClick={() => handleMobileNavClick('users')}
-                >
-                  <Users size={20} />
-                  <span>Users</span>
-                </button>
-                
-                <button
-                  className={`mis-mobile-nav-item ${activeView === 'settings' ? 'active' : ''}`}
-                  onClick={() => handleMobileNavClick('settings')}
-                >
-                  <Settings size={20} />
-                  <span>Settings</span>
-                </button>
+
+        {/* Page Content */}
+        <main className="gov-content">
+          {renderContent()}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function MISDashboardOverview({ setActiveView }) {
+  const stats = [
+    { label: "Plantation Records", value: "3,842", change: "+124 this month", icon: Leaf, color: "green" },
+    { label: "DFLs Distributed", value: "1,26,540", change: "+8,200 this month", icon: Activity, color: "blue" },
+    { label: "Cocoon Production", value: "48.6 MT", change: "+3.2 MT this month", icon: TrendingUp, color: "orange" },
+    { label: "Farmers Covered", value: "9,214", change: "+312 this month", icon: Users, color: "purple" },
+  ];
+
+  const quickLinks = [
+    { id: "plantation-overall", label: "Plantation Overall", icon: Leaf },
+    { id: "plantation-2024", label: "Scheme 2024–25", icon: ClipboardList },
+    { id: "plantation-2025", label: "Scheme 2025–26", icon: ClipboardList },
+    { id: "dfls-distribution", label: "DFLs Distribution", icon: Activity },
+    { id: "dfls-consumption", label: "DFLs Consumption", icon: Database },
+    { id: "cocoon-production", label: "Cocoon Production", icon: TrendingUp },
+  ];
+
+  const recentEntries = [
+    { label: "Plantation Overall – April 2025", status: "submitted", time: "2 hrs ago" },
+    { label: "DFLs Distribution – March 2025", status: "pending", time: "5 hrs ago" },
+    { label: "Cocoon Production – March 2025", status: "submitted", time: "Yesterday" },
+    { label: "Scheme 2024–25 – Q4 Update", status: "draft", time: "2 days ago" },
+  ];
+
+  const statusIcon = (s) => s === "submitted"
+    ? <CheckCircle2 size={14} className="gov-status-submitted" />
+    : s === "pending"
+    ? <Clock size={14} className="gov-status-pending" />
+    : <AlertCircle size={14} className="gov-status-draft" />;
+
+  return (
+    <div className="gov-overview">
+      <div className="gov-page-title">
+        <h2>Dashboard Overview</h2>
+        <p>Silk Samagra MIS Portal — Real-time sericulture data summary</p>
+      </div>
+
+      <div className="gov-stats-grid">
+        {stats.map((s, i) => {
+          const Icon = s.icon;
+          return (
+            <div key={i} className={`gov-stat-card gov-stat-${s.color}`}>
+              <div className="gov-stat-icon"><Icon size={22} /></div>
+              <div className="gov-stat-body">
+                <p className="gov-stat-label">{s.label}</p>
+                <h3 className="gov-stat-value">{s.value}</h3>
+                <span className="gov-stat-change">{s.change}</span>
               </div>
             </div>
+          );
+        })}
+      </div>
+
+      <div className="gov-overview-grid">
+        <div className="gov-card">
+          <div className="gov-card-head"><h4>Quick Data Entry</h4></div>
+          <div className="gov-quick-links">
+            {quickLinks.map(q => {
+              const Icon = q.icon;
+              return (
+                <button key={q.id} className="gov-quick-btn" onClick={() => setActiveView(q.id)}>
+                  <Icon size={16} />
+                  <span>{q.label}</span>
+                  <ChevronRight size={14} className="gov-ql-arrow" />
+                </button>
+              );
+            })}
           </div>
-        )}
-        
-        {renderContent()}
+        </div>
+
+        <div className="gov-card">
+          <div className="gov-card-head"><h4>Recent Entries</h4></div>
+          <div className="gov-recent-list">
+            {recentEntries.map((e, i) => (
+              <div key={i} className="gov-recent-item">
+                <div className="gov-recent-info">
+                  <p>{e.label}</p>
+                  <span>{e.time}</span>
+                </div>
+                <span className={`gov-status-badge gov-status-${e.status}`}>
+                  {statusIcon(e.status)} {e.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

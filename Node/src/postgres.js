@@ -109,6 +109,46 @@ export const initializeDatabase = async () => {
         EXECUTE FUNCTION update_updated_at_column();
     `);
 
+    // Create MIS entries table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mis_entries (
+        id SERIAL PRIMARY KEY,
+        section VARCHAR(10) NOT NULL,
+        farmer_name VARCHAR(255) NOT NULL,
+        farmer_id VARCHAR(100) NOT NULL,
+        address TEXT,
+        phone VARCHAR(20),
+        district VARCHAR(100) NOT NULL,
+        registration_date DATE,
+        land_area VARCHAR(50),
+        variety VARCHAR(100),
+        plantation_date DATE,
+        expected_yield VARCHAR(50),
+        notes TEXT,
+        created_by INTEGER REFERENCES sericulturists(id),
+        ad_office VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create trigger for mis_entries updated_at
+    await client.query(`
+      DROP TRIGGER IF EXISTS update_mis_entries_updated_at ON mis_entries;
+      CREATE TRIGGER update_mis_entries_updated_at
+        BEFORE UPDATE ON mis_entries
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    // Create indexes for better performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_mis_entries_section ON mis_entries(section);
+      CREATE INDEX IF NOT EXISTS idx_mis_entries_ad_office ON mis_entries(ad_office);
+      CREATE INDEX IF NOT EXISTS idx_mis_entries_created_by ON mis_entries(created_by);
+      CREATE INDEX IF NOT EXISTS idx_mis_entries_district ON mis_entries(district);
+    `);
+
     client.release();
     console.log('✅ Database schema initialized successfully');
     return true;

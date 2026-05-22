@@ -107,14 +107,17 @@ export default function UserForm({ user, onClose, onSave, mode = 'create', userR
             <div className="form-group">
               <label>
                 <Phone size={16} />
-                Phone
+                Phone <small>Optional</small>
               </label>
               <input
                 type="tel"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="Enter phone number"
+                placeholder="Enter 10-digit phone number"
+                pattern="[0-9]{10}"
+                maxLength={10}
+                title="Phone number must be exactly 10 digits"
               />
             </div>
 
@@ -160,6 +163,11 @@ export default function UserForm({ user, onClose, onSave, mode = 'create', userR
                   <option value="">--Select role--</option>
                   <option value="user">User</option>
                   <option value="section_admin">Section Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                  <option value="jis">JIS</option>
+                  <option value="ais">AIS</option>
+                  <option value="ta">TA</option>
+                  <option value="is">IS</option>
                 </select>
               ) : (
                 <input
@@ -172,49 +180,73 @@ export default function UserForm({ user, onClose, onSave, mode = 'create', userR
               )}
             </div>
 
-            <div className="form-group">
-              <label>
-                <MapPin size={16} />
-                AD Office
-              </label>
-              {isSectionAdmin ? (
-                <input
-                  type="text"
-                  name="ad_office"
-                  value={formData.ad_office}
-                  disabled
-                  className="disabled-input"
-                  title="AD Office is fixed for Section Admin"
-                />
-              ) : (
+            {formData.role === 'section_admin' ? (
+              <div className="form-group">
+                <label>
+                  <MapPin size={16} />
+                  Section Admin Section
+                </label>
                 <select
                   name="ad_office"
                   value={formData.ad_office}
                   onChange={handleChange}
                 >
                   <option value="">--Select Section--</option>
-                  <option value="Hosur">Hosur</option>
-                  <option value="Denkanikkottai">Denkanikkottai</option>
-                  <option value="Krishnagiri">Krishnagiri</option>
-                  <option value="Dharmapuri">Dharmapuri</option>
-                  <option value="Pennagaram">Pennagaram</option>
-                  <option value="Salem">Salem</option>
-                  <option value="Coimbatore">Coimbatore</option>
-                  <option value="Udumalpet">Udumalpet</option>
-                  <option value="Erode">Erode</option>
-                  <option value="Talavady">Talavady</option>
-                  <option value="Coonoor">Coonoor</option>
-                  <option value="Vaniyambadi">Vaniyambadi</option>
-                  <option value="Tiruvannamalai">Tiruvannamalai</option>
-                  <option value="Villuppuram">Villuppuram</option>
-                  <option value="Trichy">Trichy</option>
-                  <option value="Namakkal">Namakkal</option>
-                  <option value="Dindigul">Dindigul</option>
-                  <option value="Theni">Theni</option>
-                  <option value="Tenkasi">Tenkasi</option>
+                  <option value="MIS">MIS</option>
+                  <option value="PLS">PLS</option>
+                  <option value="PRC">PRC</option>
+                  <option value="POC">POC</option>
                 </select>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="form-group">
+                <label>
+                  <MapPin size={16} />
+                  AD Office
+                </label>
+                {isSectionAdmin ? (
+                  <input
+                    type="text"
+                    name="ad_office"
+                    value={formData.ad_office}
+                    disabled
+                    className="disabled-input"
+                    title="AD Office is fixed for Section Admin"
+                  />
+                ) : (
+                  <select
+                    name="ad_office"
+                    value={formData.ad_office}
+                    onChange={handleChange}
+                  >
+                    <option value="">--Select AD Office/Section--</option>
+                    <option value="MIS">MIS</option>
+                    <option value="PLS">PLS</option>
+                    <option value="PRC">PRC</option>
+                    <option value="POC">POC</option>
+                    <option value="Hosur">Hosur</option>
+                    <option value="Denkanikkottai">Denkanikkottai</option>
+                    <option value="Krishnagiri">Krishnagiri</option>
+                    <option value="Dharmapuri">Dharmapuri</option>
+                    <option value="Pennagaram">Pennagaram</option>
+                    <option value="Salem">Salem</option>
+                    <option value="Coimbatore">Coimbatore</option>
+                    <option value="Udumalpet">Udumalpet</option>
+                    <option value="Erode">Erode</option>
+                    <option value="Talavady">Talavady</option>
+                    <option value="Coonoor">Coonoor</option>
+                    <option value="Vaniyambadi">Vaniyambadi</option>
+                    <option value="Tiruvannamalai">Tiruvannamalai</option>
+                    <option value="Villuppuram">Villuppuram</option>
+                    <option value="Trichy">Trichy</option>
+                    <option value="Namakkal">Namakkal</option>
+                    <option value="Dindigul">Dindigul</option>
+                    <option value="Theni">Theni</option>
+                    <option value="Tenkasi">Tenkasi</option>
+                  </select>
+                )}
+              </div>
+            )}
 
             <div className="form-group">
               <label>

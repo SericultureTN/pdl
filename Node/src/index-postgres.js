@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import { testConnection, initializeDatabase, closePool, query } from './postgres.js';
 import { sericulturistServices } from './sericulturist-services.js';
 import { authServices, initializeDefaultAdmin } from './auth-postgres.js';
+import { misServices } from './mis-services.js';
 
 const app = express();
 
@@ -155,11 +156,13 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
-    console.log('Admin not found, trying sericulturist login');
+    console.log('Admin not found, trying sericulturist login for:', email);
 
     // Try sericulturist login (Section Admin or User)
     try {
+      console.log('Calling sericulturistServices.login...');
       const sericulturistResult = await sericulturistServices.login(email, password);
+      console.log('Sericulturist login result:', sericulturistResult);
 
       if (sericulturistResult.ok) {
         const sericulturist = sericulturistResult.sericulturist;
@@ -439,10 +442,23 @@ app.post("/api/sericulturists", requireSectionAdmin, async (req, res) => {
       return res.status(400).json({ error: "Name and email are required" });
     }
 
+    // Validate phone number (10 digits only if provided)
+    if (phone && phone.trim()) {
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(phone.trim())) {
+        return res.status(400).json({ error: "Phone number must be exactly 10 digits" });
+      }
+    }
+
     // Section admin can only create users in their own AD office
+    // AND can only create 'user' role (not section_admin)
     let finalAdOffice = ad_office?.trim() || null;
+    let finalRole = role?.trim() || 'user';
+
     if (req.user.role === ROLES.SECTION_ADMIN) {
       finalAdOffice = req.user.ad_office;
+      // Force role to 'user' - Section Admin cannot create other Section Admins
+      finalRole = 'user';
     }
 
     const userData = {
@@ -451,7 +467,7 @@ app.post("/api/sericulturists", requireSectionAdmin, async (req, res) => {
       password: password?.trim() || null,
       phone: phone?.trim() || null,
       address: address?.trim() || null,
-      role: role?.trim() || 'user',
+      role: finalRole,
       ad_office: finalAdOffice,
       status: status || 'active'
     };
@@ -502,6 +518,14 @@ app.put("/api/sericulturists/:id", requireSectionAdmin, async (req, res) => {
       return res.status(400).json({ error: "Name and email are required" });
     }
 
+    // Validate phone number (10 digits only if provided)
+    if (phone && phone.trim()) {
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(phone.trim())) {
+        return res.status(400).json({ error: "Phone number must be exactly 10 digits" });
+      }
+    }
+
     const userData = {
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -526,27 +550,43 @@ app.put("/api/sericulturists/:id", requireSectionAdmin, async (req, res) => {
   }
 });
 
-app.delete("/api/sericulturists/:id", requireSuperAdmin, async (req, res) => {
+// Bulk operations - Only Super Admin (MUST be before /:id routes)
+app.delete("/api/sericulturists/bulk", requireSuperAdmin, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Invalid sericulturist ID" });
+    const { ids } = req.body;
+    console.log('Bulk delete request received, IDs:', ids);
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      console.log('Invalid IDs array:', ids);
+      return res.status(400).json({ error: "IDs array is required" });
     }
 
-    const result = await sericulturistServices.delete(id);
+    // Validate and convert IDs to numbers
+    const validIds = ids
+      .map(id => typeof id === 'string' ? parseInt(id) : id)
+      .filter(id => typeof id === 'number' && !isNaN(id));
+    console.log('Valid IDs for deletion:', validIds);
+
+    if (validIds.length === 0) {
+      return res.status(400).json({ error: "No valid sericulturist IDs provided" });
+    }
+
+    const result = await sericulturistServices.bulkDelete(validIds);
     
     if (!result.ok) {
-      return res.status(404).json({ error: result.error });
+      return res.status(500).json({ error: result.error });
     }
 
-    return res.json({ ok: true, message: "Sericulturist deleted successfully" });
+    return res.json({ 
+      ok: true, 
+      message: `Deleted ${result.deletedCount} sericulturists` 
+    });
   } catch (error) {
-    console.error('Delete sericulturist error:', error);
+    console.error('Bulk delete error:', error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Bulk operations - Only Super Admin
 app.put("/api/sericulturists/bulk/status", requireSuperAdmin, async (req, res) => {
   try {
     const { ids, status } = req.body;
@@ -559,7 +599,16 @@ app.put("/api/sericulturists/bulk/status", requireSuperAdmin, async (req, res) =
       return res.status(400).json({ error: "Status must be 'active' or 'inactive'" });
     }
 
-    const result = await sericulturistServices.bulkUpdateStatus(ids, status);
+    // Validate and convert IDs to numbers
+    const validIds = ids
+      .map(id => typeof id === 'string' ? parseInt(id) : id)
+      .filter(id => typeof id === 'number' && !isNaN(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({ error: "No valid sericulturist IDs provided" });
+    }
+
+    const result = await sericulturistServices.bulkUpdateStatus(validIds, status);
     
     if (!result.ok) {
       return res.status(500).json({ error: result.error });
@@ -575,26 +624,26 @@ app.put("/api/sericulturists/bulk/status", requireSuperAdmin, async (req, res) =
   }
 });
 
-app.delete("/api/sericulturists/bulk", requireSuperAdmin, async (req, res) => {
+app.delete("/api/sericulturists/:id", requireSuperAdmin, async (req, res) => {
   try {
-    const { ids } = req.body;
-
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: "IDs array is required" });
+    console.log('Delete request received, ID param:', req.params.id, 'Type:', typeof req.params.id);
+    const id = parseInt(req.params.id);
+    console.log('Parsed ID:', id, 'Type:', typeof id);
+    if (isNaN(id)) {
+      console.log('Invalid ID - NaN');
+      return res.status(400).json({ error: "Invalid sericulturist ID" });
     }
 
-    const result = await sericulturistServices.bulkDelete(ids);
+    const result = await sericulturistServices.delete(id);
+    console.log('Delete result:', result);
     
     if (!result.ok) {
-      return res.status(500).json({ error: result.error });
+      return res.status(404).json({ error: result.error });
     }
 
-    return res.json({ 
-      ok: true, 
-      message: `Deleted ${result.deletedCount} sericulturists` 
-    });
+    return res.json({ ok: true, message: "Sericulturist deleted successfully" });
   } catch (error) {
-    console.error('Bulk delete error:', error);
+    console.error('Delete sericulturist error:', error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -663,6 +712,165 @@ app.get("/api/admin/admins", requireSuperAdmin, async (req, res) => {
     return res.json({ ok: true, admins: result.admins });
   } catch (error) {
     console.error('Get admins error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// MIS Entries API - All authenticated users can create entries
+app.post("/api/mis/entries", requireAuth, async (req, res) => {
+  try {
+    const entry = req.body;
+    
+    // Validate required fields
+    if (!entry.section || !entry.farmerName || !entry.farmerId) {
+      return res.status(400).json({ error: "Section, Farmer Name, and Farmer ID are required" });
+    }
+
+    // Add user info
+    entry.createdBy = req.user.id;
+    entry.adOffice = req.user.ad_office;
+
+    const result = await misServices.create(entry);
+    
+    if (!result.ok) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    return res.status(201).json({ ok: true, entry: result.entry });
+  } catch (error) {
+    console.error('Create MIS entry error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get MIS entries - filtered by user role
+app.get("/api/mis/entries", requireAuth, async (req, res) => {
+  try {
+    const { section, district, search, limit = 50, offset = 0 } = req.query;
+    
+    const filters = { limit: parseInt(limit), offset: parseInt(offset) };
+    
+    // Super Admin sees all entries
+    if (req.user.role === ROLES.SUPER_ADMIN) {
+      if (section) filters.section = section;
+      if (district) filters.district = district;
+    } 
+    // Section Admin sees entries from their assigned section
+    else if (req.user.role === ROLES.SECTION_ADMIN) {
+      filters.section = req.user.ad_office; // MIS, PLS, PRC, or POC
+    } 
+    // Regular users see entries from their AD office
+    else {
+      filters.adOffice = req.user.ad_office;
+      if (section) filters.section = section;
+    }
+    
+    if (search) filters.search = search;
+
+    const result = await misServices.getAll(filters);
+    
+    if (!result.ok) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json({ ok: true, entries: result.entries });
+  } catch (error) {
+    console.error('Get MIS entries error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get MIS entry by ID
+app.get("/api/mis/entries/:id", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid entry ID" });
+    }
+
+    const result = await misServices.getById(id);
+    
+    if (!result.ok) {
+      return res.status(404).json({ error: result.error });
+    }
+
+    // Check if user can access this entry
+    if (req.user.role === ROLES.SECTION_ADMIN && result.entry.section !== req.user.ad_office) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    return res.json({ ok: true, entry: result.entry });
+  } catch (error) {
+    console.error('Get MIS entry error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Update MIS entry - only Super Admin or Section Admin
+app.put("/api/mis/entries/:id", requireSectionAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid entry ID" });
+    }
+
+    // Check if entry exists and user has access
+    const existing = await misServices.getById(id);
+    if (!existing.ok) {
+      return res.status(404).json({ error: existing.error });
+    }
+
+    // Section Admin can only update entries in their section
+    if (req.user.role === ROLES.SECTION_ADMIN && existing.entry.section !== req.user.ad_office) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const result = await misServices.update(id, req.body);
+    
+    if (!result.ok) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    return res.json({ ok: true, entry: result.entry });
+  } catch (error) {
+    console.error('Update MIS entry error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Delete MIS entry - only Super Admin
+app.delete("/api/mis/entries/:id", requireSuperAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid entry ID" });
+    }
+
+    const result = await misServices.delete(id);
+    
+    if (!result.ok) {
+      return res.status(404).json({ error: result.error });
+    }
+
+    return res.json({ ok: true, message: "Entry deleted successfully" });
+  } catch (error) {
+    console.error('Delete MIS entry error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get MIS statistics
+app.get("/api/mis/statistics", requireSectionAdmin, async (req, res) => {
+  try {
+    const result = await misServices.getStatistics();
+    
+    if (!result.ok) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json({ ok: true, statistics: result.statistics });
+  } catch (error) {
+    console.error('Get MIS statistics error:', error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
