@@ -42,29 +42,48 @@ export function useApiData({ schemeName, buildEmptyRows, applyCarryForward, year
         }
       }
 
-      // Build a status/ID map keyed by office_name
+      // Build a map keyed by office_name
       const apiMap = {};
       apiRows.forEach(r => { apiMap[r.office_name] = r; });
 
-      // Try restoring full draft from localStorage
+      // Try restoring full draft from localStorage (only used when API has no saved record)
       const lsRaw = localStorage.getItem(LS_KEY(schemeName, yr, mo));
       const lsRows = lsRaw ? JSON.parse(lsRaw) : null;
 
-      // Start from empty rows, then merge: API status/IDs + LS draft data
+      // Merge: if API has a real saved record (id != null), use it as the source of truth.
+      // Only fall back to localStorage when there's no API record yet.
       const fresh = buildEmptyRows();
       const merged = fresh.map((row, i) => {
         const api = apiMap[row.adOffice];
         const ls  = lsRows ? lsRows[i] : null;
 
-        // Apply carry-forward from API if no saved draft
+        // API record exists — use it as truth, overlay sub-column LS data on top
+        if (api?.id) {
+          const base = applyCarryForward
+            ? applyCarryForward({ ...row, ...(ls || {}) }, api)
+            : { ...row, ...(ls || {}) };
+          return {
+            ...base,
+            // Always reflect saved core fields from API
+            ulm_acre:   parseFloat(api.ulm_acre)   || 0,
+            ulm_farmer: parseInt(api.ulm_farmer, 10) || 0,
+            dm_acre:    parseFloat(api.dm_acre)    || 0,
+            dm_farmer:  parseInt(api.dm_farmer, 10) || 0,
+            um_acre:    parseFloat(api.um_acre)    || 0,
+            um_farmer:  parseInt(api.um_farmer, 10) || 0,
+            reportId:   api.id,
+            status:     api.status || "Draft",
+          };
+        }
+
+        // No API record — use localStorage draft if available, else carry-forward
         const base = applyCarryForward
           ? applyCarryForward(ls || row, api)
           : (ls || row);
-
         return {
           ...base,
-          reportId: api?.id || null,
-          status:   api?.status || "Draft",
+          reportId: null,
+          status:   "Draft",
         };
       });
 
@@ -104,8 +123,8 @@ export function useApiData({ schemeName, buildEmptyRows, applyCarryForward, year
         monthName: mo,
         status,
       });
-      // Persist full row to localStorage for sub-column data
-      localStorage.setItem(LS_KEY(schemeName, yr, mo), JSON.stringify(currentRows));
+      // Clear localStorage so loadData reads fresh API data as truth
+      localStorage.removeItem(LS_KEY(schemeName, yr, mo));
       await loadData(yr, mo);
       return true;
     } catch (e) {
