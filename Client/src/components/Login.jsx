@@ -55,17 +55,19 @@ export default function Login({ onLogin }) {
 
           {/* Logo */}
           <div className="flex flex-col items-center text-center mb-6">
-            <img src={gvtLogo} alt="Government of Tamil Nadu"
-              className="w-20 h-20 object-contain mb-5" />
-            <h1 className="text-2xl font-black tracking-tight leading-tight" style={{ color: '#0B5D3B' }}>
+            <div className="flex items-center justify-center mb-5"
+              style={{ width: '120px', height: '120px' }}>
+              <img src={gvtLogo} alt="Government of Tamil Nadu"
+                style={{ width: '120px', height: '120px', objectFit: 'contain', display: 'block' }} />
+            </div>
+            {/* <h1 className="text-2xl font-black tracking-tight leading-tight" style={{ color: '#0B5D3B' }}>
               SILK SAMAGRA
-            </h1>
+            </h1> */}
             <h2 className="text-2xl font-black tracking-tight leading-tight" style={{ color: '#0B5D3B' }}>
-              MIS PORTAL
+              Periodicals Reports
             </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Sericulture Department, Government of Tamil Nadu
-            </p>
+            <p className="mt-2 text-sm text-gray-500">Department of Sericulture,</p>
+            <p className="text-sm text-gray-500">Tamil Nadu - 636007</p>
           </div>
 
           {/* Divider */}
@@ -159,11 +161,12 @@ export default function Login({ onLogin }) {
           {/* Portal name + features — bottom portion */}
           <div className="px-8 pb-10 pt-2">
             <h3 className="text-xl font-black text-white text-center tracking-wide mb-0.5">
-              SILK SAMAGRA MIS PORTAL
+              PDL
             </h3>
             <p className="text-center text-sm mb-5" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Monthly MIS Reporting System
+              Periodicals Reporting System
             </p>
+            <br></br>
 
             <div className="flex flex-col gap-3">
               {FEATURES.map(f => (

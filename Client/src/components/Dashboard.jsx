@@ -205,7 +205,7 @@ export default function Dashboard({ user, onLogout }) {
         <div className="header-content">
           <div className="header-left">
             <h1>PDL Admin Dashboard</h1>
-            <p>Welcome back, {user?.email}!</p>
+            <p>Enterprise Management System</p>
           </div>
           
           <div className="header-right">
@@ -326,7 +326,7 @@ export default function Dashboard({ user, onLogout }) {
         </div>
       )}
 
-      <nav className="dashboard-nav">
+      <nav className="dashboard-nav" style={{ borderTop: 'none' }}>
         <button
           className={`nav-btn ${activeView === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveView('overview')}
