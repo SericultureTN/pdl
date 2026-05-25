@@ -4,6 +4,7 @@ import {
   ShieldCheck, BarChart3, Users, FileText, Loader2, AlertCircle
 } from 'lucide-react';
 import { authService } from '../services/auth.js';
+import loginBg from '../assets/login-bg.png';
 
 const FINANCIAL_YEARS = ['2025-26', '2024-25', '2023-24', '2022-23'];
 
@@ -14,43 +15,6 @@ const FEATURES = [
   { icon: ShieldCheck,text: 'Secure Role-Based Access' },
 ];
 
-function SilkIllustration() {
-  return (
-    <svg viewBox="0 0 520 420" fill="none" xmlns="http://www.w3.org/2000/svg"
-      className="w-full h-full opacity-90" aria-hidden="true">
-      {/* Cocoon group */}
-      <ellipse cx="260" cy="200" rx="72" ry="44" fill="white" fillOpacity="0.13" />
-      <ellipse cx="260" cy="200" rx="56" ry="32" fill="white" fillOpacity="0.17" />
-      <ellipse cx="260" cy="200" rx="38" ry="20" fill="white" fillOpacity="0.22" />
-      {/* Silk thread spirals */}
-      <path d="M188 200 Q220 160 260 200 Q300 240 332 200" stroke="white" strokeOpacity="0.35" strokeWidth="1.5" fill="none" />
-      <path d="M192 208 Q224 168 260 208 Q296 248 328 208" stroke="white" strokeOpacity="0.25" strokeWidth="1" fill="none" />
-      <path d="M196 192 Q228 152 260 192 Q292 232 324 192" stroke="white" strokeOpacity="0.25" strokeWidth="1" fill="none" />
-      {/* Mulberry leaves left */}
-      <path d="M80 280 Q95 240 130 255 Q115 295 80 280Z" fill="white" fillOpacity="0.12" />
-      <path d="M70 310 Q90 270 125 290 Q105 330 70 310Z" fill="white" fillOpacity="0.10" />
-      <path d="M95 260 Q115 225 148 238 Q128 275 95 260Z" fill="white" fillOpacity="0.09" />
-      <line x1="80" y1="280" x2="148" y2="238" stroke="white" strokeOpacity="0.15" strokeWidth="1" />
-      <line x1="112" y1="258" x2="112" y2="290" stroke="white" strokeOpacity="0.12" strokeWidth="0.8" />
-      {/* Mulberry leaves right */}
-      <path d="M400 150 Q415 110 450 125 Q435 165 400 150Z" fill="white" fillOpacity="0.12" />
-      <path d="M390 180 Q410 140 445 160 Q425 200 390 180Z" fill="white" fillOpacity="0.10" />
-      <path d="M415 130 Q435 95 468 108 Q448 145 415 130Z" fill="white" fillOpacity="0.09" />
-      <line x1="400" y1="150" x2="468" y2="108" stroke="white" strokeOpacity="0.15" strokeWidth="1" />
-      {/* Flowing silk ribbon */}
-      <path d="M60 340 Q130 310 200 330 Q270 350 340 320 Q410 290 460 310"
-        stroke="white" strokeOpacity="0.2" strokeWidth="8" strokeLinecap="round" fill="none" />
-      <path d="M60 350 Q130 322 200 342 Q270 362 340 332 Q410 302 460 322"
-        stroke="white" strokeOpacity="0.12" strokeWidth="5" strokeLinecap="round" fill="none" />
-      {/* Decorative dots */}
-      {[80,160,240,320,400,450].map((x,i) => (
-        <circle key={i} cx={x} cy={60 + (i % 3)*30} r="3" fill="white" fillOpacity="0.18" />
-      ))}
-      {/* Bottom decorative line */}
-      <path d="M100 390 Q260 370 420 390" stroke="white" strokeOpacity="0.15" strokeWidth="1.5" fill="none" />
-    </svg>
-  );
-}
 
 function GovEmblem() {
   return (
@@ -276,15 +240,18 @@ export default function Login({ onLogin }) {
           {/* ── RIGHT PANEL ───────────────────────────────────────────── */}
           <div
             className="hidden md:flex w-full md:w-[58%] flex-col justify-between p-10 relative overflow-hidden"
-            style={{ background: 'linear-gradient(145deg,#0B5D3B 0%,#0e7a4f 45%,#0a5135 100%)' }}
+            style={{
+              backgroundImage: `url(${loginBg})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
           >
-            {/* Radial glow blobs */}
+            {/* Dark green gradient overlay */}
+            <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
+              style={{ background: 'linear-gradient(145deg,rgba(11,93,59,0.92) 0%,rgba(10,81,53,0.82) 50%,rgba(11,93,59,0.88) 100%)' }} />
+
+            {/* Dot matrix pattern overlay */}
             <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-              <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.04)', filter: 'blur(60px)' }} />
-              <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.03)', filter: 'blur(80px)' }} />
-              {/* Dot matrix pattern */}
               <svg className="absolute inset-0 w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                   <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
@@ -311,10 +278,21 @@ export default function Login({ onLogin }) {
               </p>
             </div>
 
-            {/* Silk illustration */}
-            <div className="relative z-10 flex-1 flex items-center justify-center py-4">
-              <div className="w-full max-w-xs opacity-80">
-                <SilkIllustration />
+            {/* Cocoon photo — floating card in center */}
+            <div className="relative z-10 flex-1 flex items-center justify-center py-6">
+              <div className="rounded-3xl overflow-hidden shadow-2xl"
+                style={{
+                  width: '220px',
+                  height: '220px',
+                  border: '2px solid rgba(255,255,255,0.2)',
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+                }}>
+                <img
+                  src={loginBg}
+                  alt="Silk cocoon with mulberry leaves"
+                  className="w-full h-full object-cover"
+                  style={{ filter: 'brightness(1.05) saturate(1.1)' }}
+                />
               </div>
             </div>
 
