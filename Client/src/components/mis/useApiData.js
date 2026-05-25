@@ -50,40 +50,35 @@ export function useApiData({ schemeName, buildEmptyRows, applyCarryForward, year
       const lsRaw = localStorage.getItem(LS_KEY(schemeName, yr, mo));
       const lsRows = lsRaw ? JSON.parse(lsRaw) : null;
 
-      // Merge: if API has a real saved record (id != null), use it as the source of truth.
-      // Only fall back to localStorage when there's no API record yet.
+      // Merge all rows: API is always source of truth for core ULM/DM/UM fields.
+      // localStorage only supplements sub-column data that the API doesn't store.
       const fresh = buildEmptyRows();
       const merged = fresh.map((row, i) => {
         const api = apiMap[row.adOffice];
         const ls  = lsRows ? lsRows[i] : null;
 
-        // API record exists — use it as truth, overlay sub-column LS data on top
-        if (api?.id) {
-          const base = applyCarryForward
-            ? applyCarryForward({ ...row, ...(ls || {}) }, api)
-            : { ...row, ...(ls || {}) };
-          return {
-            ...base,
-            // Always reflect saved core fields from API
-            ulm_acre:   parseFloat(api.ulm_acre)   || 0,
-            ulm_farmer: parseInt(api.ulm_farmer, 10) || 0,
-            dm_acre:    parseFloat(api.dm_acre)    || 0,
-            dm_farmer:  parseInt(api.dm_farmer, 10) || 0,
-            um_acre:    parseFloat(api.um_acre)    || 0,
-            um_farmer:  parseInt(api.um_farmer, 10) || 0,
-            reportId:   api.id,
-            status:     api.status || "Draft",
-          };
+        if (!api) {
+          // Office not in API response at all — use LS or empty
+          return { ...(ls || row), reportId: null, status: "Draft" };
         }
 
-        // No API record — use localStorage draft if available, else carry-forward
+        // Always apply carry-forward from API (covers both saved records and new-month ULM)
+        // applyCarryForward sets sub-column ULM values from api.ulm_acre
         const base = applyCarryForward
-          ? applyCarryForward(ls || row, api)
-          : (ls || row);
+          ? applyCarryForward({ ...row, ...(ls || {}) }, api)
+          : { ...row, ...(ls || {}) };
+
         return {
           ...base,
-          reportId: null,
-          status:   "Draft",
+          // Core fields always from API
+          ulm_acre:   parseFloat(api.ulm_acre)   || 0,
+          ulm_farmer: parseInt(api.ulm_farmer, 10) || 0,
+          dm_acre:    api.id ? (parseFloat(api.dm_acre)   || 0) : (parseFloat(base.dm_acre)   || 0),
+          dm_farmer:  api.id ? (parseInt(api.dm_farmer, 10) || 0) : (parseInt(base.dm_farmer, 10) || 0),
+          um_acre:    parseFloat(api.um_acre)    || 0,
+          um_farmer:  parseInt(api.um_farmer, 10) || 0,
+          reportId:   api.id || null,
+          status:     api.status || "Draft",
         };
       });
 

@@ -37,13 +37,16 @@ const buildEmptyRows = () =>
 
 function applyCarryForward(localRow, apiRow) {
   if (!apiRow) return localRow;
+  const ulmVal = parseFloat(apiRow.ulm_acre) || 0;
   const u = { ...localRow };
   VARIETIES.forEach(v => {
     DM_COLS.forEach(c => {
-      if (!localRow[`${v}__${c}__ulm`]) {
-        u[`${v}__${c}__ulm`] = parseFloat(apiRow.ulm_acre) || 0;
-        u[`${v}__${c}__um`]  = u[`${v}__${c}__ulm`];
-      }
+      u[`${v}__${c}__ulm`] = ulmVal;
+      u[`${v}__${c}__um`]  = ulmVal + (parseFloat(localRow[`${v}__${c}__dm`]) || 0);
+    });
+    ["bv_total", "cb_total"].forEach(c => {
+      u[`${v}__${c}__ulm`] = ulmVal;
+      u[`${v}__${c}__um`]  = ulmVal;
     });
   });
   return u;

@@ -37,16 +37,15 @@ function recalcCat(row, catId) {
 // Apply carry-forward from API row: set ULM from prev month UM where present
 function applyCarryForward(localRow, apiRow) {
   if (!apiRow) return localRow;
+  const ulmAcre   = parseFloat(apiRow.ulm_acre)   || 0;
+  const ulmFarmer = parseInt(apiRow.ulm_farmer, 10) || 0;
   const u = { ...localRow };
-  // The API only returns top-level ulm_acre / ulm_farmer for the primary category
-  // Use them as carry-forward for all categories if no local draft
   CATEGORIES.forEach(c => {
-    if (!localRow[`${c.id}__ulm_acre`]) {
-      u[`${c.id}__ulm_acre`]   = parseFloat(apiRow.ulm_acre)   || 0;
-      u[`${c.id}__ulm_farmer`] = parseFloat(apiRow.ulm_farmer) || 0;
-      u[`${c.id}__um_acre`]    = u[`${c.id}__ulm_acre`];
-      u[`${c.id}__um_farmer`]  = u[`${c.id}__ulm_farmer`];
-    }
+    u[`${c.id}__ulm_acre`]   = ulmAcre;
+    u[`${c.id}__ulm_farmer`] = ulmFarmer;
+    // Recalc UM = ULM + existing DM
+    u[`${c.id}__um_acre`]   = ulmAcre   + (parseFloat(localRow[`${c.id}__dm_acre`])   || 0);
+    u[`${c.id}__um_farmer`] = ulmFarmer + (parseInt(localRow[`${c.id}__dm_farmer`], 10) || 0);
   });
   return u;
 }
