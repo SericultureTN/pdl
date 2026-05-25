@@ -157,10 +157,7 @@ export default function Dashboard({ user, onLogout }) {
     setSelectedReport(reportType);
     setShowSectionDropdown(false);
     setShowReportsDropdown(false);
-    // Open in same tab for Section dropdown using React Router (NOT new tab)
-    const reportUrl = `/${reportType.toLowerCase()}-dashboard`;
-    console.log('Navigating to:', reportUrl, 'in same tab using React Router');
-    navigate(reportUrl);
+    setActiveView(reportType.toLowerCase());
   };
 
   const handleReportView = (reportType) => {
