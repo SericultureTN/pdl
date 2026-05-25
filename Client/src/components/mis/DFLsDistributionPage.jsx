@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
 import {
-  LayoutDashboard, ChevronRight, ChevronDown, Bell, User,
+  LayoutDashboard, ChevronRight, ChevronDown, ChevronUp, Bell,
   Lock, Calculator, FileEdit, Info, RotateCcw, Save, Send,
-  Menu, X, LogOut, BarChart2, Settings, Leaf, TreePine,
-  Layers, Activity, FileText, AlertTriangle
+  Menu, X, LogOut, BarChart2, User, Leaf,
+  FileSpreadsheet, Activity
 } from "lucide-react";
 import "./DFLsDistributionPage.css";
 
@@ -28,22 +28,14 @@ const CB_ROWS = [
 ];
 
 /* sidebar nav tree */
-const NAV = [
-  { id: "dashboard", label: "Dashboard",     icon: <LayoutDashboard size={16} /> },
-  {
-    id: "data-entry", label: "Data Entry",   icon: <FileEdit size={16} />, children: [
-      { id: "plantation-overall",  label: "Plantation Overall" },
-      { id: "scheme-2024",         label: "Plantation Scheme 2024-25" },
-      { id: "scheme-2025",         label: "Plantation Scheme 2025-26" },
-      { id: "distribution",        label: "Distribution" },
-      { id: "dfls-distribution",   label: "DFLs Distribution", active: true },
-      { id: "dfls-consumption",    label: "DFLs Consumption" },
-      { id: "cocoon-production",   label: "Cocoon Production" },
-    ],
-  },
-  { id: "reports",    label: "Reports",      icon: <BarChart2 size={16} /> },
-  { id: "analytics",  label: "MIS Analytics",icon: <Activity size={16} /> },
-  { id: "profile",    label: "Profile",      icon: <User size={16} /> },
+const DATA_ENTRY_CHILDREN = [
+  { id: "plantation-overall",  label: "Plantation Overall" },
+  { id: "scheme-2024",         label: "Plantation Scheme 2024-25" },
+  { id: "scheme-2025",         label: "Plantation Scheme 2025-26" },
+  { id: "distribution",        label: "Distribution" },
+  { id: "dfls-distribution",   label: "DFLs Distribution", active: true },
+  { id: "dfls-consumption",    label: "DFLs Consumption" },
+  { id: "cocoon-production",   label: "Cocoon Production" },
 ];
 
 /* ══════════════════════════════════════════════════════════════
@@ -52,12 +44,12 @@ const NAV = [
 function buildInitial() {
   return {
     bv_govt:   { ulm: 120, dm: "", um: 0 },
-    bv_nsso:   { ulm: 85,  dm: "", um: 0 },
-    bv_tnpvt:  { ulm: 60,  dm: "", um: 0 },
-    bv_other:  { ulm: 45,  dm: "", um: 0 },
-    cb_other:  { ulm: 30,  dm: "", um: 0 },
-    cb_nsso:   { ulm: 20,  dm: "", um: 0 },
-    p1:        { ulm: 95,  dm: "", um: 0 },
+    bv_nsso:   { ulm: 200, dm: "", um: 0 },
+    bv_tnpvt:  { ulm: 150, dm: "", um: 0 },
+    bv_other:  { ulm: 40,  dm: "", um: 0 },
+    cb_other:  { ulm: 80,  dm: "", um: 0 },
+    cb_nsso:   { ulm: 40,  dm: "", um: 0 },
+    p1:        { ulm: 220, dm: "", um: 0 },
   };
 }
 
@@ -85,270 +77,267 @@ function grandTotal(data, tier) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   SUB-COMPONENTS
+   SECTION BLOCK — collapsible section inside a card
 ══════════════════════════════════════════════════════════════ */
-
-/* ---------- Accordion ---------- */
-function Accordion({ title, children, defaultOpen = true }) {
-  const [open, setOpen] = useState(defaultOpen);
+function Section({ title, children }) {
+  const [open, setOpen] = useState(true);
   return (
-    <div className="dfls-accordion">
-      <button className="dfls-accordion-trigger" onClick={() => setOpen(o => !o)}>
-        <span>{title}</span>
-        <ChevronDown size={14} className={`dfls-chevron ${open ? "open" : ""}`} />
+    <div className="dfls-section">
+      <button className="dfls-section-hd" onClick={() => setOpen(o => !o)}>
+        <span className="dfls-section-title">{title}</span>
+        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
-      {open && <div className="dfls-accordion-body">{children}</div>}
+      {open && children}
     </div>
   );
 }
 
-/* ---------- ULM Card ---------- */
+/* ══════════════════════════════════════════════════════════════
+   ULM CARD
+══════════════════════════════════════════════════════════════ */
 function ULMCard({ data }) {
   return (
     <div className="dfls-entry-card dfls-card-ulm">
-      <div className="dfls-card-header dfls-header-ulm">
-        <div className="dfls-card-header-left">
-          <div className="dfls-card-icon"><Lock size={16} /></div>
+      {/* Header */}
+      <div className="dfls-card-hd dfls-card-hd-ulm">
+        <div className="dfls-card-hd-left">
+          <div className="dfls-card-hd-icon"><FileSpreadsheet size={16} /></div>
           <div>
-            <div className="dfls-card-title">ULM</div>
-            <div className="dfls-card-sub">Up to Last Month</div>
+            <div className="dfls-card-hd-title">ULM (Up to Last Month)</div>
+            <div className="dfls-card-hd-sub">Read Only</div>
           </div>
         </div>
-        <Lock size={14} className="dfls-card-lock" />
+        <Lock size={15} className="dfls-card-hd-lock" />
       </div>
-      <div className="dfls-card-body">
 
-        <Accordion title="BV — Basic Varieties">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Category</th><th>Nos</th></tr></thead>
-            <tbody>
-              {BV_ROWS.map(r => (
-                <tr key={r.key}>
-                  <td>{r.label}</td>
-                  <td className="dfls-cell-readonly">{num(data[`bv_${r.key}`]?.ulm)}</td>
-                </tr>
-              ))}
-              <tr className="dfls-row-total">
-                <td>Total</td>
-                <td>{bvTotal(data, "ulm")}</td>
+      {/* BV */}
+      <Section title="BV">
+        <table className="dfls-tbl">
+          <thead><tr><th>Category</th><th>Nos</th></tr></thead>
+          <tbody>
+            {BV_ROWS.map(r => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td className="dfls-val-ro">{num(data[`bv_${r.key}`]?.ulm)}</td>
               </tr>
-            </tbody>
-          </table>
-        </Accordion>
+            ))}
+            <tr className="dfls-tbl-total">
+              <td><strong>Total</strong></td>
+              <td><strong>{bvTotal(data, "ulm")}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
 
-        <Accordion title="CB — Chawki Bed">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Category</th><th>Nos</th></tr></thead>
-            <tbody>
-              {CB_ROWS.map(r => (
-                <tr key={r.key}>
-                  <td>{r.label}</td>
-                  <td className="dfls-cell-readonly">{num(data[r.key]?.ulm)}</td>
-                </tr>
-              ))}
-              <tr className="dfls-row-total">
-                <td>Total</td>
-                <td>{cbTotal(data, "ulm")}</td>
+      {/* CB */}
+      <Section title="CB">
+        <table className="dfls-tbl">
+          <thead><tr><th>Category</th><th>Nos</th></tr></thead>
+          <tbody>
+            {CB_ROWS.map(r => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td className="dfls-val-ro">{num(data[r.key]?.ulm)}</td>
               </tr>
-            </tbody>
-          </table>
-        </Accordion>
+            ))}
+            <tr className="dfls-tbl-total">
+              <td><strong>Total</strong></td>
+              <td><strong>{cbTotal(data, "ulm")}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
 
-        <Accordion title="P1 — Priority 1">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Type</th><th>Value</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>P1</td>
-                <td className="dfls-cell-readonly">{num(data.p1?.ulm)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </Accordion>
+      {/* P1 */}
+      <Section title="P1">
+        <table className="dfls-tbl">
+          <thead><tr><th>Value</th><th>Nos</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Value</td>
+              <td className="dfls-val-ro">{num(data.p1?.ulm)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
 
-        <div className="dfls-grand-total dfls-grand-ulm">
-          <span>Grand Total</span>
-          <span className="dfls-grand-value">{grandTotal(data, "ulm")}</span>
-        </div>
+      {/* Grand total */}
+      <div className="dfls-grand dfls-grand-ulm">
+        <span>Grand Total</span>
+        <strong className="dfls-grand-num">{grandTotal(data, "ulm")}</strong>
       </div>
     </div>
   );
 }
 
-/* ---------- DM Card ---------- */
+/* ══════════════════════════════════════════════════════════════
+   DM CARD
+══════════════════════════════════════════════════════════════ */
 function DMCard({ data, onChange }) {
-  const handleChange = (field, value) => {
-    onChange(field, value);
-  };
-
   return (
     <div className="dfls-entry-card dfls-card-dm">
-      <div className="dfls-card-header dfls-header-dm">
-        <div className="dfls-card-header-left">
-          <div className="dfls-card-icon"><FileEdit size={16} /></div>
+      <div className="dfls-card-hd dfls-card-hd-dm">
+        <div className="dfls-card-hd-left">
+          <div className="dfls-card-hd-icon"><FileEdit size={16} /></div>
           <div>
-            <div className="dfls-card-title">DM</div>
-            <div className="dfls-card-sub">During Month</div>
+            <div className="dfls-card-hd-title dfls-dm-title">DM (During Month)</div>
+            <div className="dfls-card-hd-sub">Enter Current Month Data</div>
           </div>
         </div>
-        <span className="dfls-editable-badge">Editable</span>
+        <FileEdit size={15} className="dfls-card-hd-pen" />
       </div>
-      <div className="dfls-card-body">
 
-        <Accordion title="BV — Basic Varieties">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Category</th><th>Nos</th></tr></thead>
-            <tbody>
-              {BV_ROWS.map(r => (
-                <tr key={r.key}>
-                  <td>{r.label}</td>
-                  <td>
-                    <input
-                      type="number"
-                      className="dfls-cell-input"
-                      value={data[`bv_${r.key}`]?.dm}
-                      min={0}
-                      placeholder="0"
-                      onChange={e => handleChange(`bv_${r.key}`, e.target.value)}
-                    />
-                  </td>
-                </tr>
-              ))}
-              <tr className="dfls-row-total">
-                <td>Total</td>
-                <td>{bvTotal(data, "dm")}</td>
-              </tr>
-            </tbody>
-          </table>
-        </Accordion>
-
-        <Accordion title="CB — Chawki Bed">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Category</th><th>Nos</th></tr></thead>
-            <tbody>
-              {CB_ROWS.map(r => (
-                <tr key={r.key}>
-                  <td>{r.label}</td>
-                  <td>
-                    <input
-                      type="number"
-                      className="dfls-cell-input"
-                      value={data[r.key]?.dm}
-                      min={0}
-                      placeholder="0"
-                      onChange={e => handleChange(r.key, e.target.value)}
-                    />
-                  </td>
-                </tr>
-              ))}
-              <tr className="dfls-row-total">
-                <td>Total</td>
-                <td>{cbTotal(data, "dm")}</td>
-              </tr>
-            </tbody>
-          </table>
-        </Accordion>
-
-        <Accordion title="P1 — Priority 1">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Type</th><th>Value</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>P1</td>
+      {/* BV */}
+      <Section title="BV">
+        <table className="dfls-tbl">
+          <thead><tr><th>Category</th><th>Nos</th></tr></thead>
+          <tbody>
+            {BV_ROWS.map(r => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
                 <td>
                   <input
-                    type="number"
-                    className="dfls-cell-input"
-                    value={data.p1?.dm}
-                    min={0}
-                    placeholder="0"
-                    onChange={e => handleChange("p1", e.target.value)}
+                    type="number" min={0} placeholder="0"
+                    className="dfls-inp"
+                    value={data[`bv_${r.key}`]?.dm}
+                    onChange={e => onChange(`bv_${r.key}`, e.target.value)}
                   />
                 </td>
               </tr>
-            </tbody>
-          </table>
-        </Accordion>
+            ))}
+            <tr className="dfls-tbl-total dfls-tbl-total-dm">
+              <td><strong>Total</strong></td>
+              <td><strong className="dfls-ora">{bvTotal(data, "dm")}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
 
-        <div className="dfls-grand-total dfls-grand-dm">
-          <span>Grand Total</span>
-          <span className="dfls-grand-value">{grandTotal(data, "dm")}</span>
-        </div>
+      {/* CB */}
+      <Section title="CB">
+        <table className="dfls-tbl">
+          <thead><tr><th>Category</th><th>Nos</th></tr></thead>
+          <tbody>
+            {CB_ROWS.map(r => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td>
+                  <input
+                    type="number" min={0} placeholder="0"
+                    className="dfls-inp"
+                    value={data[r.key]?.dm}
+                    onChange={e => onChange(r.key, e.target.value)}
+                  />
+                </td>
+              </tr>
+            ))}
+            <tr className="dfls-tbl-total dfls-tbl-total-dm">
+              <td><strong>Total</strong></td>
+              <td><strong className="dfls-ora">{cbTotal(data, "dm")}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
+
+      {/* P1 */}
+      <Section title="P1">
+        <table className="dfls-tbl">
+          <thead><tr><th>Value</th><th>Nos</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Value</td>
+              <td>
+                <input
+                  type="number" min={0} placeholder="0"
+                  className="dfls-inp"
+                  value={data.p1?.dm}
+                  onChange={e => onChange("p1", e.target.value)}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
+
+      <div className="dfls-grand dfls-grand-dm">
+        <span className="dfls-ora">Grand Total</span>
+        <strong className="dfls-grand-num dfls-ora">{grandTotal(data, "dm")}</strong>
       </div>
     </div>
   );
 }
 
-/* ---------- UM Card ---------- */
+/* ══════════════════════════════════════════════════════════════
+   UM CARD
+══════════════════════════════════════════════════════════════ */
 function UMCard({ data }) {
   return (
     <div className="dfls-entry-card dfls-card-um">
-      <div className="dfls-card-header dfls-header-um">
-        <div className="dfls-card-header-left">
-          <div className="dfls-card-icon"><Calculator size={16} /></div>
+      <div className="dfls-card-hd dfls-card-hd-um">
+        <div className="dfls-card-hd-left">
+          <div className="dfls-card-hd-icon"><FileSpreadsheet size={16} /></div>
           <div>
-            <div className="dfls-card-title">UM</div>
-            <div className="dfls-card-sub">Up to Month</div>
+            <div className="dfls-card-hd-title dfls-um-title">UM (Up to Month)</div>
+            <div className="dfls-card-hd-sub">Auto Calculated</div>
           </div>
         </div>
-        <span className="dfls-auto-badge">Auto</span>
+        <Calculator size={15} className="dfls-card-hd-calc" />
       </div>
-      <div className="dfls-card-body">
 
-        <div className="dfls-formula-pill">UM = ULM + DM</div>
-
-        <Accordion title="BV — Basic Varieties">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Category</th><th>Nos</th></tr></thead>
-            <tbody>
-              {BV_ROWS.map(r => (
-                <tr key={r.key}>
-                  <td>{r.label}</td>
-                  <td className="dfls-cell-calc">{num(data[`bv_${r.key}`]?.ulm) + num(data[`bv_${r.key}`]?.dm)}</td>
-                </tr>
-              ))}
-              <tr className="dfls-row-total">
-                <td>Total</td>
-                <td>{bvTotal(data, "ulm") + bvTotal(data, "dm")}</td>
+      {/* BV */}
+      <Section title="BV">
+        <table className="dfls-tbl">
+          <thead><tr><th>Category</th><th>Nos</th></tr></thead>
+          <tbody>
+            {BV_ROWS.map(r => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td className="dfls-val-calc">{num(data[`bv_${r.key}`]?.ulm) + num(data[`bv_${r.key}`]?.dm)}</td>
               </tr>
-            </tbody>
-          </table>
-        </Accordion>
+            ))}
+            <tr className="dfls-tbl-total dfls-tbl-total-um">
+              <td><strong>Total</strong></td>
+              <td><strong className="dfls-grn">{bvTotal(data, "ulm") + bvTotal(data, "dm")}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
 
-        <Accordion title="CB — Chawki Bed">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Category</th><th>Nos</th></tr></thead>
-            <tbody>
-              {CB_ROWS.map(r => (
-                <tr key={r.key}>
-                  <td>{r.label}</td>
-                  <td className="dfls-cell-calc">{num(data[r.key]?.ulm) + num(data[r.key]?.dm)}</td>
-                </tr>
-              ))}
-              <tr className="dfls-row-total">
-                <td>Total</td>
-                <td>{cbTotal(data, "ulm") + cbTotal(data, "dm")}</td>
+      {/* CB */}
+      <Section title="CB">
+        <table className="dfls-tbl">
+          <thead><tr><th>Category</th><th>Nos</th></tr></thead>
+          <tbody>
+            {CB_ROWS.map(r => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td className="dfls-val-calc">{num(data[r.key]?.ulm) + num(data[r.key]?.dm)}</td>
               </tr>
-            </tbody>
-          </table>
-        </Accordion>
+            ))}
+            <tr className="dfls-tbl-total dfls-tbl-total-um">
+              <td><strong>Total</strong></td>
+              <td><strong className="dfls-grn">{cbTotal(data, "ulm") + cbTotal(data, "dm")}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
 
-        <Accordion title="P1 — Priority 1">
-          <table className="dfls-mini-table">
-            <thead><tr><th>Type</th><th>Value</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>P1</td>
-                <td className="dfls-cell-calc">{num(data.p1?.ulm) + num(data.p1?.dm)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </Accordion>
+      {/* P1 */}
+      <Section title="P1">
+        <table className="dfls-tbl">
+          <thead><tr><th>Value</th><th>Nos</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Value</td>
+              <td className="dfls-val-calc">{num(data.p1?.ulm) + num(data.p1?.dm)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
 
-        <div className="dfls-grand-total dfls-grand-um">
-          <span>Grand Total</span>
-          <span className="dfls-grand-value">{grandTotal(data, "ulm") + grandTotal(data, "dm")}</span>
-        </div>
+      <div className="dfls-grand dfls-grand-um">
+        <span className="dfls-grn">Grand Total</span>
+        <strong className="dfls-grand-num dfls-grn">{grandTotal(data, "ulm") + grandTotal(data, "dm")}</strong>
       </div>
     </div>
   );
@@ -402,7 +391,7 @@ export default function DFLsDistributionPage({ user, onBack }) {
         {/* Brand */}
         <div className="dfls-brand">
           <div className="dfls-brand-logo">
-            <Leaf size={20} />
+            <Leaf size={18} />
           </div>
           <div className="dfls-brand-text">
             <span className="dfls-brand-title">SILK SAMAGRA</span>
@@ -412,52 +401,67 @@ export default function DFLsDistributionPage({ user, onBack }) {
 
         {/* Navigation */}
         <nav className="dfls-nav">
-          {NAV.map(item => (
-            <div key={item.id}>
-              <button
-                className={`dfls-nav-item ${item.children ? "has-children" : ""} ${item.id === "data-entry" && dataEntryOpen ? "expanded" : ""}`}
-                onClick={() => {
-                  if (item.children) setDataEntryOpen(o => !o);
-                  else if (item.id === "dashboard" && onBack) onBack();
-                }}
-              >
-                <span className="dfls-nav-icon">{item.icon}</span>
-                <span className="dfls-nav-label">{item.label}</span>
-                {item.children && (
-                  <ChevronDown size={13} className={`dfls-nav-arrow ${dataEntryOpen ? "open" : ""}`} />
-                )}
-              </button>
 
-              {item.children && dataEntryOpen && (
-                <div className="dfls-nav-children">
-                  {item.children.map(child => (
-                    <button
-                      key={child.id}
-                      className={`dfls-nav-child ${child.active ? "active" : ""}`}
-                    >
-                      <span className="dfls-child-dot" />
-                      {child.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+          {/* Dashboard */}
+          <button className="dfls-nav-item" onClick={onBack}>
+            <span className="dfls-nav-icon"><LayoutDashboard size={16} /></span>
+            <span className="dfls-nav-label">Dashboard</span>
+          </button>
+
+          {/* Data Entry (always expanded) */}
+          <button
+            className={`dfls-nav-item ${dataEntryOpen ? "expanded" : ""}`}
+            onClick={() => setDataEntryOpen(o => !o)}
+          >
+            <span className="dfls-nav-icon"><FileEdit size={16} /></span>
+            <span className="dfls-nav-label">Data Entry</span>
+            <ChevronDown size={13} className={`dfls-nav-arrow ${dataEntryOpen ? "open" : ""}`} />
+          </button>
+
+          {dataEntryOpen && (
+            <div className="dfls-nav-children">
+              {DATA_ENTRY_CHILDREN.map(child => (
+                <button
+                  key={child.id}
+                  className={`dfls-nav-child ${child.active ? "active" : ""}`}
+                >
+                  {child.label}
+                </button>
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* Reports */}
+          <button className="dfls-nav-item">
+            <span className="dfls-nav-icon"><BarChart2 size={16} /></span>
+            <span className="dfls-nav-label">Reports</span>
+            <ChevronRight size={13} className="dfls-nav-arrow" />
+          </button>
+
+          {/* MIS Analytics */}
+          <button className="dfls-nav-item">
+            <span className="dfls-nav-icon"><Activity size={16} /></span>
+            <span className="dfls-nav-label">MIS Analytics</span>
+          </button>
+
+          {/* Profile */}
+          <button className="dfls-nav-item">
+            <span className="dfls-nav-icon"><User size={16} /></span>
+            <span className="dfls-nav-label">Profile</span>
+          </button>
 
           <div className="dfls-nav-spacer" />
 
+          {/* Logout */}
           <button className="dfls-nav-item dfls-nav-logout" onClick={onBack}>
             <span className="dfls-nav-icon"><LogOut size={16} /></span>
             <span className="dfls-nav-label">Logout</span>
           </button>
         </nav>
 
-        {/* Decorative bottom cocoon illustration */}
-        <div className="dfls-sidebar-deco">
-          <div className="dfls-deco-leaves">
-            <TreePine size={64} className="dfls-deco-icon" />
-          </div>
-          <div className="dfls-deco-text">Silk Samagra</div>
+        {/* Decorative cocoon image at bottom */}
+        <div className="dfls-sidebar-deco" aria-hidden="true">
+          <div className="dfls-deco-cocoon" />
         </div>
       </aside>
 
@@ -606,40 +610,28 @@ export default function DFLsDistributionPage({ user, onBack }) {
             </div>
           </div>
 
-          {/* ── SECTION 2: 3-Column Entry Cards ── */}
-          <div className="dfls-section-label">
-            <FileText size={14} />
-            Monthly Data Entry — <strong>{monthLabel}</strong>
-          </div>
-
+          {/* ── 3-Column Entry Cards ── */}
           <div className="dfls-cards-grid">
             <ULMCard data={data} />
             <DMCard  data={data} onChange={handleDMChange} />
             <UMCard  data={data} />
           </div>
 
-          {/* ── Formula Note ── */}
-          <div className="dfls-note-card">
-            <Info size={15} />
-            <div>
-              <strong>Note:</strong> UM (Up to Month) values are auto calculated as: &nbsp;
-              <code className="dfls-formula-code">UM = ULM + DM</code>
+          {/* ── Bottom row: note left, buttons right ── */}
+          <div className="dfls-bottom-row">
+            <div className="dfls-note-card">
+              <Info size={15} className="dfls-note-icon" />
+              <div>
+                <span className="dfls-note-bold">Note: </span>
+                <span className="dfls-note-link">UM (Up to Month) values are auto calculated as:</span>
+                <br />
+                <span className="dfls-note-formula">UM = ULM + DM</span>
+              </div>
             </div>
-          </div>
-
-          {/* ── Action Buttons ── */}
-          <div className="dfls-action-bar">
-            <div className="dfls-action-left" />
-            <div className="dfls-action-right">
-              <button className="dfls-btn dfls-btn-reset" onClick={handleReset}>
-                <RotateCcw size={14} /> Reset
-              </button>
-              <button className="dfls-btn dfls-btn-draft" onClick={handleSaveDraft}>
-                <Save size={14} /> Save Draft
-              </button>
-              <button className="dfls-btn dfls-btn-submit" onClick={handleSubmit}>
-                <Send size={14} /> Submit
-              </button>
+            <div className="dfls-action-btns">
+              <button className="dfls-btn dfls-btn-reset" onClick={handleReset}>Reset</button>
+              <button className="dfls-btn dfls-btn-draft" onClick={handleSaveDraft}>Save Draft</button>
+              <button className="dfls-btn dfls-btn-submit" onClick={handleSubmit}>Submit</button>
             </div>
           </div>
 
