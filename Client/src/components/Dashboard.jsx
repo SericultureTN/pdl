@@ -522,7 +522,7 @@ export default function Dashboard({ user, onLogout }) {
             </div>
           )}
 
-          {activeView === 'mis'              && <MISDashboard user={user} />}
+          {activeView === 'mis'              && <MISDashboard user={user} onBack={() => setActiveView('overview')} />}
           {activeView === 'pls'              && <PLSDashboard user={user} />}
           {activeView === 'prc'              && <PRCDashboard user={user} />}
           {activeView === 'poc'              && <POCDashboard user={user} />}
