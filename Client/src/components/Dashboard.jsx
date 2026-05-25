@@ -5,6 +5,7 @@ import { authService } from '../services/auth.js';
 import { sericulturistService } from "../services/sericulturist.js";
 import UserList from "./UserList.jsx";
 import MISDashboard from "./MISDashboard.jsx";
+import MISPage from "../pages/MISPage.jsx";
 import PLSDashboard from "./PLSDashboard.jsx";
 import PRCDashboard from "./PRCDashboard.jsx";
 import POCDashboard from "./POCDashboard.jsx";
@@ -157,13 +158,13 @@ export default function Dashboard({ user, onLogout }) {
     setSelectedReport(reportType);
     setShowSectionDropdown(false);
     setShowReportsDropdown(false);
-    navigate(`/${reportType.toLowerCase()}-dashboard`, { state: { user } });
+    setActiveView(reportType.toLowerCase());
   };
 
   const handleReportView = (reportType) => {
     setSelectedReport(reportType);
     setShowReportsDropdown(false);
-    navigate(`/${reportType.toLowerCase()}-dashboard`, { state: { user } });
+    setActiveView(reportType.toLowerCase());
   };
 
   const handleDownloadReport = (reportType) => {
@@ -189,6 +190,10 @@ export default function Dashboard({ user, onLogout }) {
     { id: 'reports-trigger',    label: 'Reports',   icon: <FileText size={18} />,  show: true, hasDropdown: true },
     { id: 'settings',           label: 'Settings',  icon: <Settings size={18} />,  show: true },
   ];
+
+  if (activeView === 'mis') {
+    return <MISPage user={user} onBack={() => setActiveView('overview')} />;
+  }
 
   return (
     <div className="db-root">
@@ -518,7 +523,7 @@ export default function Dashboard({ user, onLogout }) {
             </div>
           )}
 
-          {activeView === 'mis'              && <MISDashboard user={user} onBack={() => setActiveView('overview')} />}
+          {activeView === 'mis'              && <MISPage user={user} onBack={() => setActiveView('overview')} />}
           {activeView === 'pls'              && <PLSDashboard user={user} />}
           {activeView === 'prc'              && <PRCDashboard user={user} />}
           {activeView === 'poc'              && <POCDashboard user={user} />}

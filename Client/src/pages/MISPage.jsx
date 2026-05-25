@@ -36,8 +36,9 @@ const NAV_ITEMS = [
 
 const FINANCIAL_YEARS = ["2025-26", "2024-25", "2023-24", "2022-23"];
 
-export default function MISPage({ user }) {
+export default function MISPage({ user, onBack }) {
   const navigate = useNavigate();
+  const goBack = onBack || (() => navigate("/"));
   const [activeView, setActiveView] = useState("dashboard");
   const [dataEntryOpen, setDataEntryOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -139,7 +140,7 @@ export default function MISPage({ user }) {
             );
           })}
 
-          <button className="gov-nav-item gov-nav-logout" onClick={() => navigate("/")}>
+          <button className="gov-nav-item gov-nav-logout" onClick={goBack}>
             <LogOut size={17} className="gov-nav-icon" />
             <span className="gov-nav-label">Back to Portal</span>
           </button>
