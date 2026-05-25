@@ -10,6 +10,7 @@ import { testConnection, initializeDatabase, closePool, query } from './postgres
 import { sericulturistServices } from './sericulturist-services.js';
 import { authServices, initializeDefaultAdmin } from './auth-postgres.js';
 import { misServices } from './mis-services.js';
+import { getMasterData, targetServices, misReportServices } from './mis-report-services.js';
 
 const app = express();
 
@@ -872,6 +873,250 @@ app.get("/api/mis/statistics", requireSectionAdmin, async (req, res) => {
   } catch (error) {
     console.error('Get MIS statistics error:', error);
     return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// =====================================================================
+// AUTH — /me endpoint
+// =====================================================================
+
+app.get("/api/me", requireAuth, (req, res) => {
+  return res.json({ ok: true, user: req.user });
+});
+
+// =====================================================================
+// MASTER DATA ROUTES
+// =====================================================================
+
+app.get("/api/regions", requireAuth, async (_req, res) => {
+  try {
+    const result = await getMasterData.regions();
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/ad-offices", requireAuth, async (req, res) => {
+  try {
+    const result = await getMasterData.adOffices(req.query.region_id || null);
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/financial-years", requireAuth, async (_req, res) => {
+  try {
+    const result = await getMasterData.financialYears();
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/months", requireAuth, async (_req, res) => {
+  try {
+    const result = await getMasterData.months();
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/schemes", requireAuth, async (_req, res) => {
+  try {
+    const result = await getMasterData.schemes();
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// =====================================================================
+// TARGET ROUTES (Super Admin / MIS Admin only)
+// =====================================================================
+
+app.post("/api/targets", requireSectionAdmin, async (req, res) => {
+  try {
+    const { officeId, schemeId, financialYearId, targetAcre, targetFarmer } = req.body;
+    if (!officeId || !schemeId || !financialYearId) {
+      return res.status(400).json({ error: "officeId, schemeId, financialYearId are required" });
+    }
+    const result = await targetServices.upsert({ officeId, schemeId, financialYearId, targetAcre, targetFarmer });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/targets", requireAuth, async (req, res) => {
+  try {
+    const { officeId, schemeId, financialYearId } = req.query;
+    const result = await targetServices.getForOffice({ officeId, schemeId, financialYearId });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// =====================================================================
+// MIS REPORT ROUTES
+// =====================================================================
+
+// GET /api/mis-report — list reports with filters
+app.get("/api/mis-report", requireAuth, async (req, res) => {
+  try {
+    const { scheme_id, year_id, month_id, status, limit, offset } = req.query;
+
+    // AD Office User can only see their own office
+    let officeId = req.query.office_id || null;
+    if (req.user.role === ROLES.USER || req.user.role === 'user') {
+      const officeRow = await query(
+        'SELECT id FROM ad_offices WHERE office_name=$1', [req.user.ad_office]
+      );
+      officeId = officeRow.rows[0]?.id || null;
+    }
+
+    const result = await misReportServices.getReports({
+      schemeId: scheme_id || null,
+      yearId:   year_id   || null,
+      monthId:  month_id  || null,
+      officeId,
+      status:   status    || null,
+      limit:    parseInt(limit)  || 100,
+      offset:   parseInt(offset) || 0,
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/monthly-report — load one office+scheme+year+month (with carry-forward ULM)
+app.get("/api/monthly-report", requireAuth, async (req, res) => {
+  try {
+    const { office_name, scheme_name, year_name, month_name } = req.query;
+
+    // Derive office_name from JWT for AD Office User
+    let officeName = office_name;
+    if (req.user.role === ROLES.USER || req.user.role === 'user') {
+      officeName = req.user.ad_office;
+    }
+    if (!officeName || !scheme_name || !year_name || !month_name) {
+      return res.status(400).json({ error: "office_name, scheme_name, year_name, month_name required" });
+    }
+
+    const result = await misReportServices.loadReport({
+      officeName, schemeName: scheme_name, yearName: year_name, monthName: month_name,
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/monthly-report/all — load ALL offices for scheme+year+month (admin view)
+app.get("/api/monthly-report/all", requireSectionAdmin, async (req, res) => {
+  try {
+    const { scheme_name, year_name, month_name } = req.query;
+    if (!scheme_name || !year_name || !month_name) {
+      return res.status(400).json({ error: "scheme_name, year_name, month_name required" });
+    }
+    const result = await misReportServices.loadAllOfficesReport({
+      schemeName: scheme_name, yearName: year_name, monthName: month_name,
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/mis-report — save / upsert a single office report
+app.post("/api/mis-report", requireAuth, async (req, res) => {
+  try {
+    const { office_name, scheme_name, year_name, month_name, dm_acre, dm_farmer, status } = req.body;
+
+    let officeName = office_name;
+    if (req.user.role === ROLES.USER || req.user.role === 'user') {
+      officeName = req.user.ad_office;
+    }
+    if (!officeName || !scheme_name || !year_name || !month_name) {
+      return res.status(400).json({ error: "office_name, scheme_name, year_name, month_name required" });
+    }
+
+    const result = await misReportServices.saveReport({
+      officeName, schemeName: scheme_name, yearName: year_name, monthName: month_name,
+      dmAcre: dm_acre, dmFarmer: dm_farmer,
+      submittedBy: req.user.id,
+      status: status || 'Draft',
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/mis-report/bulk — save all offices at once (admin)
+app.post("/api/mis-report/bulk", requireSectionAdmin, async (req, res) => {
+  try {
+    const { rows, scheme_name, year_name, month_name, status } = req.body;
+    if (!Array.isArray(rows) || !scheme_name || !year_name || !month_name) {
+      return res.status(400).json({ error: "rows[], scheme_name, year_name, month_name required" });
+    }
+    const result = await misReportServices.saveBulkReports({
+      rows, schemeName: scheme_name, yearName: year_name, monthName: month_name,
+      submittedBy: req.user.id, status: status || 'Draft',
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/mis-report/:id — update status (Approve / Reject)
+app.put("/api/mis-report/:id", requireSectionAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid report ID" });
+    const { status } = req.body;
+    const result = await misReportServices.updateStatus({ reportId: id, status, updatedBy: req.user.id });
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// =====================================================================
+// DASHBOARD ROUTES
+// =====================================================================
+
+app.get("/api/dashboard-summary", requireAuth, async (req, res) => {
+  try {
+    const { scheme_id, year_id } = req.query;
+    const result = await misReportServices.dashboardSummary({
+      schemeId: scheme_id || null,
+      yearId:   year_id   || null,
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/submission-status", requireSectionAdmin, async (req, res) => {
+  try {
+    const { scheme_id, year_id, month_id } = req.query;
+    if (!scheme_id || !year_id || !month_id) {
+      return res.status(400).json({ error: "scheme_id, year_id, month_id required" });
+    }
+    const result = await misReportServices.submissionStatus({
+      schemeId: scheme_id, yearId: year_id, monthId: month_id,
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
 });
 

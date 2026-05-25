@@ -1331,6 +1331,53 @@
 }
 
 /* ============================================================
+   STATUS BADGES
+   ============================================================ */
+.gov-status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.gov-status-draft     { background: #f1f5f9; color: #64748b; }
+.gov-status-submitted { background: #dbeafe; color: #1d4ed8; }
+.gov-status-approved  { background: #dcfce7; color: #15803d; }
+.gov-status-rejected  { background: #fee2e2; color: #dc2626; }
+.gov-status-not\ started { background: #f1f5f9; color: #9ca3af; }
+
+/* ============================================================
+   LOADING + ALERTS
+   ============================================================ */
+.gov-loading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 20px;
+  color: var(--gov-text-mid);
+  font-size: 0.85rem;
+}
+.gov-alert {
+  padding: 10px 16px;
+  border-radius: var(--gov-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.gov-alert-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+@keyframes gov-spin {
+  to { transform: rotate(360deg); }
+}
+.gov-spin {
+  animation: gov-spin 0.7s linear infinite;
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 1024px) {

@@ -61,12 +61,12 @@ export default function MISPage({ user }) {
 
   const renderContent = () => {
     switch (activeView) {
-      case "plantation-overall": return <PlantationOverall />;
-      case "plantation-2024": return <PlantationScheme year="2024–25" />;
-      case "plantation-2025": return <PlantationScheme year="2025–26" />;
-      case "dfls-distribution": return <DFLsDistribution />;
-      case "dfls-consumption": return <DFLsConsumption />;
-      case "cocoon-production": return <CocoonProduction />;
+      case "plantation-overall": return <PlantationOverall user={user} />;
+      case "plantation-2024": return <PlantationScheme year="2024–25" user={user} />;
+      case "plantation-2025": return <PlantationScheme year="2025–26" user={user} />;
+      case "dfls-distribution": return <DFLsDistribution user={user} />;
+      case "dfls-consumption": return <DFLsConsumption user={user} />;
+      case "cocoon-production": return <CocoonProduction user={user} />;
       case "dashboard": return <MISDashboardOverview setActiveView={setActiveView} />;
       default:
         return (
