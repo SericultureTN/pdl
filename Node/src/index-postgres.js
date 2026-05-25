@@ -1045,11 +1045,12 @@ app.post("/api/mis-report", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "office_name, scheme_name, year_name, month_name required" });
     }
 
+    const resolvedStatus = status || 'Draft';
     const result = await misReportServices.saveReport({
       officeName, schemeName: scheme_name, yearName: year_name, monthName: month_name,
       dmAcre: dm_acre, dmFarmer: dm_farmer,
-      submittedBy: req.user.id,
-      status: status || 'Draft',
+      submittedBy: resolvedStatus === 'Submitted' ? (req.user.id || null) : null,
+      status: resolvedStatus,
     });
     return res.json(result);
   } catch (e) {
@@ -1064,9 +1065,11 @@ app.post("/api/mis-report/bulk", requireSectionAdmin, async (req, res) => {
     if (!Array.isArray(rows) || !scheme_name || !year_name || !month_name) {
       return res.status(400).json({ error: "rows[], scheme_name, year_name, month_name required" });
     }
+    const resolvedStatus = status || 'Draft';
     const result = await misReportServices.saveBulkReports({
       rows, schemeName: scheme_name, yearName: year_name, monthName: month_name,
-      submittedBy: req.user.id, status: status || 'Draft',
+      submittedBy: resolvedStatus === 'Submitted' ? (req.user.id || null) : null,
+      status: resolvedStatus,
     });
     return res.json(result);
   } catch (e) {

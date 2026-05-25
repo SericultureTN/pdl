@@ -311,12 +311,18 @@ export const initializeDatabase = async () => {
         um_farmer           INTEGER DEFAULT 0,
         status              VARCHAR(20) DEFAULT 'Draft'
                               CHECK (status IN ('Draft','Submitted','Approved','Rejected')),
-        submitted_by        INTEGER REFERENCES sericulturists(id),
+        submitted_by        INTEGER,
         submitted_at        TIMESTAMP WITH TIME ZONE,
         created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(office_id, scheme_id, financial_year_id, month_id)
       );
+    `);
+
+    // Drop the submitted_by FK if it exists (users can be admins or sericulturists)
+    await client.query(`
+      ALTER TABLE mis_reports
+        DROP CONSTRAINT IF EXISTS mis_reports_submitted_by_fkey;
     `);
 
     await client.query(`
