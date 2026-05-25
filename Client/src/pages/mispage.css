@@ -674,6 +674,7 @@
 .gov-layout {
   display: flex;
   min-height: 100vh;
+  height: 100%;
   background: var(--gov-bg);
   font-family: 'Inter', 'Segoe UI', sans-serif;
 }

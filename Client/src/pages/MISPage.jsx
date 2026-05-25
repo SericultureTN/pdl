@@ -13,6 +13,17 @@ import DFLsConsumption from "../components/mis/DFLsConsumption.jsx";
 import CocoonProduction from "../components/mis/CocoonProduction.jsx";
 import "./mispage.css";
 
+/* ── inline style tokens ── */
+const S = {
+  root:    { display:"flex", minHeight:"100vh", fontFamily:"'Inter','Segoe UI',sans-serif", background:"#f4f6f8" },
+  sidebar: { width:240, flexShrink:0, background:"linear-gradient(180deg,#0B5D3B 0%,#063d26 100%)", display:"flex", flexDirection:"column", position:"sticky", top:0, height:"100vh", overflowY:"auto" },
+  brand:   { display:"flex", alignItems:"center", gap:10, padding:"16px 14px", borderBottom:"1px solid rgba(255,255,255,0.1)" },
+  logoBox: { width:36, height:36, borderRadius:8, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 },
+  main:    { flex:1, display:"flex", flexDirection:"column", minWidth:0 },
+  header:  { height:58, background:"#fff", borderBottom:"1px solid #e0e7ef", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", position:"sticky", top:0, zIndex:40, boxShadow:"0 1px 4px rgba(0,0,0,0.06)", flexShrink:0 },
+  content: { flex:1, padding:"20px 24px", overflowY:"auto" },
+};
+
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "master", label: "Master", icon: Database },
@@ -81,110 +92,123 @@ export default function MISPage({ user, onBack }) {
   };
 
   if (activeView === "dfls-distribution") {
-    return (
-      <DFLsDistributionPage
-        user={user}
-        onBack={() => setActiveView("dashboard")}
-      />
-    );
+    return <DFLsDistributionPage user={user} onBack={() => setActiveView("dashboard")} />;
   }
 
   return (
-    <div className={`gov-layout ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
-      {/* ===== SIDEBAR ===== */}
-      <aside className="gov-sidebar">
-        <div className="gov-sidebar-brand">
-          <div className="gov-brand-logo"><Leaf size={22} /></div>
-          <div className="gov-brand-text">
-            <span className="gov-brand-title">Silk Samagra</span>
-            <span className="gov-brand-sub">MIS Portal</span>
-          </div>
-        </div>
-
-        <nav className="gov-sidebar-nav">
-          {NAV_ITEMS.map(item => {
-            const Icon = item.icon;
-            const hasChildren = !!item.children;
-            const isActive = item.id === activeView || (hasChildren && isDataEntryChild && item.id === "data-entry");
-            const isExpanded = hasChildren && dataEntryOpen;
-
-            return (
-              <div key={item.id}>
-                <button
-                  className={`gov-nav-item ${isActive ? "active" : ""}`}
-                  onClick={() => handleNav(item.id, hasChildren)}
-                >
-                  <Icon size={17} className="gov-nav-icon" />
-                  <span className="gov-nav-label">{item.label}</span>
-                  {hasChildren && (
-                    <span className="gov-nav-arrow">
-                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </span>
-                  )}
-                </button>
-                {hasChildren && isExpanded && (
-                  <div className="gov-nav-children">
-                    {item.children.map(child => (
-                      <button
-                        key={child.id}
-                        className={`gov-nav-child ${activeView === child.id ? "active" : ""}`}
-                        onClick={() => setActiveView(child.id)}
-                      >
-                        <span className="gov-child-dot" />
-                        {child.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          <button className="gov-nav-item gov-nav-logout" onClick={goBack}>
-            <LogOut size={17} className="gov-nav-icon" />
-            <span className="gov-nav-label">Back to Portal</span>
-          </button>
-        </nav>
-      </aside>
-
-      {/* ===== MAIN ===== */}
-      <div className="gov-main">
-        {/* Top Header */}
-        <header className="gov-header">
-          <div className="gov-header-left">
-            <button className="gov-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
-              <Menu size={20} />
-            </button>
-            <div className="gov-breadcrumb">
-              <span className="gov-bc-root">MIS Portal</span>
-              <ChevronRight size={14} />
-              {isDataEntryChild && <><span className="gov-bc-root">Data Entry</span><ChevronRight size={14} /></>}
-              <span className="gov-bc-current">{breadcrumbLabel()}</span>
+    <div style={S.root}>
+      {/* ── SIDEBAR ── */}
+      {sidebarOpen && (
+        <aside style={S.sidebar}>
+          {/* Brand */}
+          <div style={S.brand}>
+            <div style={S.logoBox}><Leaf size={20} color="#fff" /></div>
+            <div style={{display:"flex",flexDirection:"column"}}>
+              <span style={{fontSize:"0.8rem",fontWeight:800,color:"#fff",letterSpacing:"0.4px"}}>SILK SAMAGRA</span>
+              <span style={{fontSize:"0.6rem",color:"rgba(255,255,255,0.45)",marginTop:1}}>MIS PORTAL</span>
             </div>
           </div>
-          <div className="gov-header-right">
-            <div className="gov-fy-select">
-              <Calendar size={15} />
-              <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+
+          {/* Nav */}
+          <nav style={{flex:1,padding:"6px 0",display:"flex",flexDirection:"column",overflowY:"auto"}}>
+            {NAV_ITEMS.map(item => {
+              const Icon = item.icon;
+              const hasChildren = !!item.children;
+              const isActive = item.id === activeView || (hasChildren && isDataEntryChild && item.id === "data-entry");
+              const isExpanded = hasChildren && dataEntryOpen;
+              return (
+                <div key={item.id}>
+                  <button
+                    onClick={() => handleNav(item.id, hasChildren)}
+                    style={{
+                      display:"flex", alignItems:"center", gap:9, width:"100%",
+                      padding:"9px 16px", background: isActive ? "rgba(255,255,255,0.18)" : "none",
+                      border:"none", color: isActive ? "#fff" : "rgba(255,255,255,0.65)",
+                      fontSize:"0.82rem", fontWeight: isActive ? 600 : 400,
+                      cursor:"pointer", textAlign:"left",
+                      borderLeft: isActive ? "3px solid #fff" : "3px solid transparent",
+                    }}
+                  >
+                    <Icon size={16} style={{flexShrink:0}} />
+                    <span style={{flex:1}}>{item.label}</span>
+                    {hasChildren && (isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />)}
+                  </button>
+                  {hasChildren && isExpanded && (
+                    <div style={{background:"rgba(0,0,0,0.2)"}}>
+                      {item.children.map(child => (
+                        <button
+                          key={child.id}
+                          onClick={() => setActiveView(child.id)}
+                          style={{
+                            display:"block", width:"100%", padding:"7px 16px 7px 38px",
+                            background: activeView === child.id ? "rgba(255,255,255,0.14)" : "none",
+                            border:"none",
+                            color: activeView === child.id ? "#fff" : "rgba(255,255,255,0.55)",
+                            fontSize:"0.78rem", fontWeight: activeView === child.id ? 600 : 400,
+                            cursor:"pointer", textAlign:"left",
+                          }}
+                        >
+                          {child.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div style={{flex:1}} />
+            <button
+              onClick={goBack}
+              style={{display:"flex",alignItems:"center",gap:9,width:"100%",padding:"10px 16px",background:"none",border:"none",borderTop:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",fontSize:"0.82rem",cursor:"pointer",textAlign:"left"}}
+            >
+              <LogOut size={16} />
+              <span>Back to Portal</span>
+            </button>
+          </nav>
+        </aside>
+      )}
+
+      {/* ── MAIN ── */}
+      <div style={S.main}>
+        {/* Header */}
+        <header style={S.header}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={() => setSidebarOpen(o => !o)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",padding:6,borderRadius:6,color:"#4b5e6e"}}>
+              <Menu size={20} />
+            </button>
+            <div style={{display:"flex",alignItems:"center",gap:5,fontSize:"0.72rem",color:"#8fa3b1"}}>
+              <span>MIS Portal</span>
+              <ChevronRight size={13} />
+              {isDataEntryChild && <><span>Data Entry</span><ChevronRight size={13} /></>}
+              <span style={{color:"#0B5D3B",fontWeight:600}}>{breadcrumbLabel()}</span>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,background:"#f0fbf6",border:"1px solid #d1fae5",borderRadius:7,padding:"5px 10px"}}>
+              <Calendar size={14} color="#0B5D3B" />
+              <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={{border:"none",background:"none",fontSize:"0.78rem",color:"#0B5D3B",fontWeight:600,outline:"none",cursor:"pointer"}}>
                 {FINANCIAL_YEARS.map(y => <option key={y}>{y}</option>)}
               </select>
             </div>
-            <button className="gov-icon-btn">
-              <Bell size={18} />
-              <span className="gov-notif-dot" />
-            </button>
-            <div className="gov-user-chip">
-              <div className="gov-user-avatar">{user?.name?.[0] || "U"}</div>
-              <div className="gov-user-info">
-                <span className="gov-user-name">{user?.name || "User"}</span>
-                <span className="gov-user-role">{user?.role || "Officer"}</span>
+            <div style={{position:"relative"}}>
+              <button style={{width:34,height:34,borderRadius:"50%",border:"1px solid #e0e7ef",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                <Bell size={16} color="#4b5e6e" />
+              </button>
+              <span style={{position:"absolute",top:-3,right:-3,width:14,height:14,background:"#ef4444",borderRadius:"50%",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.5rem",color:"#fff",fontWeight:700}}>3</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,background:"#f0fbf6",border:"1px solid #d1fae5",borderRadius:8,padding:"5px 10px 5px 5px"}}>
+              <div style={{width:30,height:30,borderRadius:"50%",background:"#0B5D3B",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.72rem",fontWeight:800}}>{user?.name?.[0]?.toUpperCase() || "U"}</div>
+              <div style={{display:"flex",flexDirection:"column",lineHeight:1.2}}>
+                <span style={{fontSize:"0.78rem",fontWeight:700,color:"#1a2533"}}>{user?.name || "User"}</span>
+                <span style={{fontSize:"0.63rem",color:"#8fa3b1"}}>{user?.role || "Officer"}</span>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="gov-content">
+        {/* Content */}
+        <main style={S.content}>
           {renderContent()}
         </main>
       </div>
