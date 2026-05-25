@@ -157,14 +157,13 @@ export default function Dashboard({ user, onLogout }) {
     setSelectedReport(reportType);
     setShowSectionDropdown(false);
     setShowReportsDropdown(false);
-    setActiveView(reportType.toLowerCase());
+    navigate(`/${reportType.toLowerCase()}-dashboard`);
   };
 
   const handleReportView = (reportType) => {
     setSelectedReport(reportType);
     setShowReportsDropdown(false);
-    // Open in same dashboard for Reports dropdown
-    setActiveView(reportType.toLowerCase());
+    navigate(`/${reportType.toLowerCase()}-dashboard`);
   };
 
   const handleDownloadReport = (reportType) => {
