@@ -64,7 +64,7 @@ export default function MISPage({ user }) {
       case "plantation-overall": return <PlantationOverall user={user} />;
       case "plantation-2024": return <PlantationScheme year="2024-25" user={user} />;
       case "plantation-2025": return <PlantationScheme year="2025-26" user={user} />;
-      case "dfls-distribution": return <DFLsDistributionPage user={user} onBack={() => setActiveView("dashboard")} />;
+      case "dfls-distribution": return null;
       case "dfls-consumption": return <DFLsConsumption user={user} />;
       case "cocoon-production": return <CocoonProduction user={user} />;
       case "dashboard": return <MISDashboardOverview setActiveView={setActiveView} />;
@@ -78,6 +78,15 @@ export default function MISPage({ user }) {
         );
     }
   };
+
+  if (activeView === "dfls-distribution") {
+    return (
+      <DFLsDistributionPage
+        user={user}
+        onBack={() => setActiveView("dashboard")}
+      />
+    );
+  }
 
   return (
     <div className={`gov-layout ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
