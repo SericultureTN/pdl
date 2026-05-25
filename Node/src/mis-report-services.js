@@ -154,7 +154,12 @@ export const misReportServices = {
           `SELECT um_acre, um_farmer FROM mis_reports
            WHERE office_id=$1 AND scheme_id=$2
              AND financial_year_id=$3 AND month_id=$4
-             AND status IN ('Submitted','Approved')`,
+           ORDER BY CASE status
+             WHEN 'Approved'  THEN 1
+             WHEN 'Submitted' THEN 2
+             WHEN 'Draft'     THEN 3
+             ELSE 4 END
+           LIMIT 1`,
           [prevIds.officeId, prevIds.schemeId, prevIds.yearId, prevIds.monthId]
         );
         if (prevReport.rows[0]) {
@@ -236,9 +241,14 @@ export const misReportServices = {
         const prevMonthR = await query('SELECT id FROM months WHERE month_name=$1', [prev.monthName]);
         if (prevYearR.rows[0] && prevMonthR.rows[0]) {
           const prevReports = await query(
-            `SELECT office_id, um_acre, um_farmer FROM mis_reports
+            `SELECT DISTINCT ON (office_id) office_id, um_acre, um_farmer
+             FROM mis_reports
              WHERE scheme_id=$1 AND financial_year_id=$2 AND month_id=$3
-               AND status IN ('Submitted','Approved')`,
+             ORDER BY office_id, CASE status
+               WHEN 'Approved'  THEN 1
+               WHEN 'Submitted' THEN 2
+               WHEN 'Draft'     THEN 3
+               ELSE 4 END`,
             [schemeId, prevYearR.rows[0].id, prevMonthR.rows[0].id]
           );
           prevReports.rows.forEach(r => { prevReportMap[r.office_id] = r; });
@@ -285,23 +295,43 @@ export const misReportServices = {
   async saveReport({ officeName, schemeName, yearName, monthName, dmAcre, dmFarmer, submittedBy = null, status = 'Draft' }) {
     const ids = await resolveIds({ officeName, schemeName, yearName, monthName });
 
-    // Fetch ULM from previous month
-    const prev = prevMonthInfo(yearName, monthName);
-    let ulmAcre = 0, ulmFarmer = 0;
-    if (prev) {
-      try {
-        const prevIds = await resolveIds({ officeName, schemeName, yearName: prev.yearName, monthName: prev.monthName });
-        const prevR = await query(
-          `SELECT um_acre, um_farmer FROM mis_reports
-           WHERE office_id=$1 AND scheme_id=$2 AND financial_year_id=$3 AND month_id=$4
-             AND status IN ('Submitted','Approved')`,
-          [prevIds.officeId, prevIds.schemeId, prevIds.yearId, prevIds.monthId]
-        );
-        if (prevR.rows[0]) {
-          ulmAcre   = parseFloat(prevR.rows[0].um_acre)   || 0;
-          ulmFarmer = parseInt(prevR.rows[0].um_farmer, 10) || 0;
-        }
-      } catch (_) {}
+    // Check if a record already exists (to preserve its ULM on update)
+    const existing = await query(
+      `SELECT ulm_acre, ulm_farmer FROM mis_reports
+       WHERE office_id=$1 AND scheme_id=$2 AND financial_year_id=$3 AND month_id=$4`,
+      [ids.officeId, ids.schemeId, ids.yearId, ids.monthId]
+    );
+
+    let ulmAcre, ulmFarmer;
+
+    if (existing.rows[0]) {
+      // Record exists — preserve stored ULM (don't re-derive from prev month)
+      ulmAcre   = parseFloat(existing.rows[0].ulm_acre)   || 0;
+      ulmFarmer = parseInt(existing.rows[0].ulm_farmer, 10) || 0;
+    } else {
+      // New record — derive ULM from previous month UM (any status: Draft/Submitted/Approved)
+      ulmAcre = 0; ulmFarmer = 0;
+      const prev = prevMonthInfo(yearName, monthName);
+      if (prev) {
+        try {
+          const prevIds = await resolveIds({ officeName, schemeName, yearName: prev.yearName, monthName: prev.monthName });
+          const prevR = await query(
+            `SELECT um_acre, um_farmer FROM mis_reports
+             WHERE office_id=$1 AND scheme_id=$2 AND financial_year_id=$3 AND month_id=$4
+             ORDER BY CASE status
+               WHEN 'Approved'  THEN 1
+               WHEN 'Submitted' THEN 2
+               WHEN 'Draft'     THEN 3
+               ELSE 4 END
+             LIMIT 1`,
+            [prevIds.officeId, prevIds.schemeId, prevIds.yearId, prevIds.monthId]
+          );
+          if (prevR.rows[0]) {
+            ulmAcre   = parseFloat(prevR.rows[0].um_acre)   || 0;
+            ulmFarmer = parseInt(prevR.rows[0].um_farmer, 10) || 0;
+          }
+        } catch (_) {}
+      }
     }
 
     const dm_acre   = parseFloat(dmAcre)   || 0;
