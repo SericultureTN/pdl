@@ -20,8 +20,8 @@ const NAV_ITEMS = [
     id: "data-entry", label: "Data Entry", icon: ClipboardList,
     children: [
       { id: "plantation-overall", label: "Plantation Overall" },
-      { id: "plantation-2024", label: "Plantation Scheme 2024–25" },
-      { id: "plantation-2025", label: "Plantation Scheme 2025–26" },
+      { id: "plantation-2024", label: "Plantation Scheme 2024-25" },
+      { id: "plantation-2025", label: "Plantation Scheme 2025-26" },
       { id: "dfls-distribution", label: "DFLs Distribution" },
       { id: "dfls-consumption", label: "DFLs Consumption" },
       { id: "cocoon-production", label: "Cocoon Production" },
@@ -34,14 +34,14 @@ const NAV_ITEMS = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-const FINANCIAL_YEARS = ["2025–26", "2024–25", "2023–24", "2022–23"];
+const FINANCIAL_YEARS = ["2025-26", "2024-25", "2023-24", "2022-23"];
 
 export default function MISPage({ user }) {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState("dashboard");
   const [dataEntryOpen, setDataEntryOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedYear, setSelectedYear] = useState("2025–26");
+  const [selectedYear, setSelectedYear] = useState("2025-26");
 
   const breadcrumbLabel = () => {
     const flat = NAV_ITEMS.flatMap(n => n.children ? [n, ...n.children] : [n]);
@@ -62,8 +62,8 @@ export default function MISPage({ user }) {
   const renderContent = () => {
     switch (activeView) {
       case "plantation-overall": return <PlantationOverall user={user} />;
-      case "plantation-2024": return <PlantationScheme year="2024–25" user={user} />;
-      case "plantation-2025": return <PlantationScheme year="2025–26" user={user} />;
+      case "plantation-2024": return <PlantationScheme year="2024-25" user={user} />;
+      case "plantation-2025": return <PlantationScheme year="2025-26" user={user} />;
       case "dfls-distribution": return <DFLsDistribution user={user} />;
       case "dfls-consumption": return <DFLsConsumption user={user} />;
       case "cocoon-production": return <CocoonProduction user={user} />;

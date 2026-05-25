@@ -5,7 +5,7 @@ export const MONTHS = [
   "October", "November", "December", "January", "February", "March"
 ];
 
-export const YEARS = ["2025–26", "2024–25", "2023–24", "2022–23"];
+export const YEARS = ["2025-26", "2024-25", "2023-24", "2022-23"];
 
 export const REGIONS_MAP = {
   "All Regions": [],
