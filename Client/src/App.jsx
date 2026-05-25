@@ -10,8 +10,10 @@ import { authService } from './services/auth.js';
 import './App.css';
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('pdl_user')) || null; } catch { return null; }
+  });
+  const [loading, setLoading] = useState(!sessionStorage.getItem('pdl_user'));
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
@@ -22,12 +24,15 @@ function App() {
         console.log('Auth result:', result);
         if (result.ok && result.user) {
           setUser(result.user);
+          sessionStorage.setItem('pdl_user', JSON.stringify(result.user));
         } else {
           console.log('No valid user session found');
+          sessionStorage.removeItem('pdl_user');
+          setUser(null);
         }
       } catch (error) {
         console.log('Not authenticated:', error.message);
-        // Don't throw error, just continue to login
+        if (!sessionStorage.getItem('pdl_user')) setUser(null);
       } finally {
         setLoading(false);
         setAuthChecked(true);
@@ -39,6 +44,7 @@ function App() {
 
   const handleLogin = (userData) => {
     console.log('User logged in:', userData);
+    sessionStorage.setItem('pdl_user', JSON.stringify(userData));
     setUser(userData);
   };
 
@@ -46,10 +52,10 @@ function App() {
     try {
       await authService.logout();
       console.log('User logged out');
-      setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
-      // Still logout locally even if API call fails
+    } finally {
+      sessionStorage.removeItem('pdl_user');
       setUser(null);
     }
   };
@@ -73,7 +79,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route path="/mis-dashboard" element={<MISPage user={user} />} />
+      <Route path="/mis-dashboard" element={<MISPage user={user} onBack={() => window.history.back()} />} />
       <Route path="/pls-dashboard" element={<PLSPage user={user} />} />
       <Route path="/prc-dashboard" element={<PRCPage user={user} />} />
       <Route path="/poc-dashboard" element={<POCPage user={user} />} />

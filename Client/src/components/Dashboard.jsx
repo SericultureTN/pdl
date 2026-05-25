@@ -157,13 +157,13 @@ export default function Dashboard({ user, onLogout }) {
     setSelectedReport(reportType);
     setShowSectionDropdown(false);
     setShowReportsDropdown(false);
-    navigate(`/${reportType.toLowerCase()}-dashboard`);
+    navigate(`/${reportType.toLowerCase()}-dashboard`, { state: { user } });
   };
 
   const handleReportView = (reportType) => {
     setSelectedReport(reportType);
     setShowReportsDropdown(false);
-    navigate(`/${reportType.toLowerCase()}-dashboard`);
+    navigate(`/${reportType.toLowerCase()}-dashboard`, { state: { user } });
   };
 
   const handleDownloadReport = (reportType) => {
