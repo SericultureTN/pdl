@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Lock, Mail, Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { authService } from '../services/auth.js';
 import loginBg from '../assets/login-bg.png';
 import gvtLogo from '../assets/gvt-logo.png';
 
-const FOCUS = { boxShadow: '0 0 0 3px rgba(11,93,59,0.15)', borderColor: '#0B5D3B', background: '#fff' };
-const BLUR  = { boxShadow: '', borderColor: '#e5e7eb', background: '#f9fafb' };
+const FEATURES = [
+  'Monthly Wise Reporting',
+  'AD Office Wise Management',
+  'Real-time Analytics & Reports',
+  'Secure & Role-based Access',
+];
 
 export default function Login({ onLogin }) {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -32,173 +36,143 @@ export default function Login({ onLogin }) {
     } finally { setLoading(false); }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4 md:p-8"
-      style={{ background: 'linear-gradient(135deg, #072e1e 0%, #0B5D3B 50%, #0a4a2e 100%)' }}>
+  const inputBase = {
+    width: '100%', padding: '11px 14px', borderRadius: '8px',
+    border: '1px solid #d1d5db', background: '#fff',
+    fontSize: '14px', color: '#111827', outline: 'none',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+  };
 
-      {/* Background dot grid */}
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        <svg className="w-full h-full opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="bg-dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-              <circle cx="2" cy="2" r="1.5" fill="white" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#bg-dots)" />
-        </svg>
-      </div>
-      {/* Radial glow top-right */}
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full pointer-events-none" aria-hidden="true"
-        style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 65%)', transform: 'translate(25%,-25%)' }} />
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
 
       {/* ══════ CARD ══════ */}
-      <div className="relative z-10 w-full max-w-4xl rounded-3xl overflow-hidden flex flex-col md:flex-row"
-        style={{ boxShadow: '0 40px 100px rgba(0,0,0,0.5)', minHeight: '580px' }}>
+      <div className="w-full flex flex-col md:flex-row overflow-hidden rounded-2xl"
+        style={{ maxWidth: '900px', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
 
-        {/* ─── LEFT: Form panel ─── */}
-        <div className="w-full md:w-[44%] bg-white flex flex-col px-9 py-10 md:px-11 md:py-12">
+        {/* ─── LEFT: Form ─── */}
+        <div className="w-full md:w-[48%] bg-white flex flex-col px-10 py-12">
 
-          {/* Branding block */}
-          <div className="flex flex-col items-center text-center mb-8">
-            <div className="p-2 rounded-2xl mb-4" style={{ background: '#f0faf5' }}>
-              <img src={gvtLogo} alt="Government of Tamil Nadu"
-                className="w-[88px] h-[88px] object-contain"
-                style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.08))' }} />
-            </div>
-            <h1 className="text-[22px] font-black tracking-tight leading-tight" style={{ color: '#0B5D3B' }}>
-              Periodicals Reports
+          {/* Logo */}
+          <div className="flex flex-col items-center text-center mb-6">
+            <img src={gvtLogo} alt="Government of Tamil Nadu"
+              className="w-20 h-20 object-contain mb-5" />
+            <h1 className="text-2xl font-black tracking-tight leading-tight" style={{ color: '#0B5D3B' }}>
+              SILK SAMAGRA
             </h1>
-            {/* Green accent underline */}
-            <div className="mt-1.5 w-10 h-[3px] rounded-full" style={{ background: '#0B5D3B', opacity: 0.3 }} />
-            <p className="mt-3 text-[13px] font-semibold text-gray-700">Department of Sericulture</p>
-            <p className="text-[12px] text-gray-400">Tamil Nadu – 636007</p>
+            <h2 className="text-2xl font-black tracking-tight leading-tight" style={{ color: '#0B5D3B' }}>
+              MIS PORTAL
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Sericulture Department, Government of Tamil Nadu
+            </p>
           </div>
 
-          {/* Form heading */}
-          <p className="text-[13px] font-bold text-gray-500 uppercase tracking-widest mb-5 text-center">
-            — Sign in to your account —
-          </p>
+          {/* Divider */}
+          <hr className="border-gray-200 mb-6" />
 
-          {/* Form */}
+          {/* Form heading */}
+          <p className="text-[15px] font-bold text-gray-800 mb-5">Sign in to your account</p>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 flex-1" noValidate>
 
             {/* Username */}
             <div>
-              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                Username
-              </label>
-              <div className="relative">
-                <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: '#9ca3af' }} />
-                <input
-                  name="email" type="email" required autoComplete="email"
-                  placeholder="Enter your username"
-                  value={formData.email} onChange={handleChange}
-                  onFocus={e => Object.assign(e.currentTarget.style, FOCUS)}
-                  onBlur={e  => Object.assign(e.currentTarget.style, BLUR)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm text-gray-800 placeholder-gray-300 outline-none transition-all"
-                  style={{ borderColor: '#e5e7eb', background: '#f9fafb' }}
-                />
-              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
+              <input
+                name="email" type="email" required autoComplete="email"
+                placeholder="Enter username"
+                value={formData.email} onChange={handleChange}
+                style={inputBase}
+                onFocus={e => { e.currentTarget.style.borderColor = '#0B5D3B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(11,93,59,0.12)'; }}
+                onBlur={e  => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.boxShadow = ''; }}
+              />
             </div>
 
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Password</label>
-                <button type="button" className="text-[11px] font-semibold hover:underline transition"
-                  style={{ color: '#0B5D3B' }}>
-                  Forgot Password?
+                <label className="text-sm font-medium text-gray-700">Password</label>
+                <button type="button" className="text-sm font-medium hover:underline"
+                  style={{ color: '#2563eb' }}>
+                  Forgot password?
                 </button>
               </div>
               <div className="relative">
-                <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: '#9ca3af' }} />
                 <input
                   name="password" type={showPwd ? 'text' : 'password'} required
-                  autoComplete="current-password" placeholder="Enter your password"
+                  autoComplete="current-password" placeholder="Enter password"
                   value={formData.password} onChange={handleChange}
-                  onFocus={e => Object.assign(e.currentTarget.style, FOCUS)}
-                  onBlur={e  => Object.assign(e.currentTarget.style, BLUR)}
-                  className="w-full pl-10 pr-11 py-3 rounded-xl border text-sm text-gray-800 placeholder-gray-300 outline-none transition-all"
-                  style={{ borderColor: '#e5e7eb', background: '#f9fafb' }}
+                  style={{ ...inputBase, paddingRight: '42px' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = '#0B5D3B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(11,93,59,0.12)'; }}
+                  onBlur={e  => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.boxShadow = ''; }}
                 />
                 <button type="button" onClick={() => setShowPwd(v => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition"
-                  style={{ color: '#9ca3af' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#374151'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>
-                  {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
+                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
             {/* Error */}
             {error && (
-              <div className="flex items-start gap-2 px-3.5 py-2.5 rounded-xl text-xs font-medium"
+              <div className="flex items-start gap-2 px-3.5 py-2.5 rounded-lg text-xs font-medium"
                 style={{ background: '#fff5f5', border: '1px solid #fecaca', color: '#dc2626' }}>
                 <AlertCircle size={13} className="shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
 
-            {/* Sign In button */}
+            {/* Sign In */}
             <button type="submit" disabled={loading}
-              className="w-full py-3.5 rounded-xl text-white font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 mt-1"
-              style={{ background: loading ? '#4a9e75' : '#0B5D3B', boxShadow: '0 6px 20px rgba(11,93,59,0.38)' }}
-              onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = '#094d31'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(11,93,59,0.45)'; } }}
-              onMouseLeave={e => { if (!loading) { e.currentTarget.style.background = '#0B5D3B'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(11,93,59,0.38)'; } }}>
+              className="w-full py-3 rounded-lg text-white font-bold text-sm tracking-wide transition-all duration-200 mt-1"
+              style={{ background: loading ? '#4a9e75' : '#0B5D3B' }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#094d31'; }}
+              onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#0B5D3B'; }}>
               {loading
-                ? <><Loader2 size={15} className="animate-spin" />Signing in…</>
-                : <><span>Sign In</span><ArrowRight size={15} /></>}
+                ? <span className="flex items-center justify-center gap-2"><Loader2 size={15} className="animate-spin" />Signing in…</span>
+                : 'Sign In'}
             </button>
           </form>
 
           {/* Footer */}
-          <p className="text-center text-[11px] text-gray-400 mt-8 leading-relaxed">
-            © 2026 Sericulture Department, Government of Tamil Nadu
+          <p className="text-[11px] text-gray-400 mt-8 leading-relaxed">
+            © 2024 Sericulture Department, Government of Tamil Nadu<br />All rights reserved.
           </p>
         </div>
 
-        {/* ─── RIGHT: Image panel ─── */}
-        <div className="hidden md:flex md:w-[56%] flex-col items-center justify-center relative overflow-hidden"
-          style={{ background: 'linear-gradient(160deg, #0a5c3a 0%, #0d7347 45%, #083d26 100%)' }}>
+        {/* ─── RIGHT: Image + features ─── */}
+        <div className="hidden md:flex md:w-[52%] flex-col relative overflow-hidden"
+          style={{ background: 'linear-gradient(175deg, #0a5c3a 0%, #0B5D3B 40%, #083d26 100%)' }}>
 
-          {/* Dot overlay */}
-          <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-            <svg className="w-full h-full opacity-[0.07]" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="r-dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-                  <circle cx="2" cy="2" r="1.3" fill="white" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#r-dots)" />
-            </svg>
+          {/* Cocoon image — top portion */}
+          <div className="flex-1 flex items-center justify-center pt-8 pb-2 px-6">
+            <img src={loginBg} alt="Silk cocoon with mulberry leaves"
+              className="object-contain w-full"
+              style={{
+                maxHeight: '320px',
+                filter: 'drop-shadow(0 16px 40px rgba(0,0,0,0.5)) brightness(1.04) saturate(1.15)',
+              }}
+            />
           </div>
 
-          {/* Inner radial glow */}
-          <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
-            style={{ background: 'radial-gradient(ellipse at 50% 45%, rgba(255,255,255,0.08) 0%, transparent 65%)' }} />
+          {/* Portal name + features — bottom portion */}
+          <div className="px-8 pb-10 pt-2">
+            <h3 className="text-xl font-black text-white text-center tracking-wide mb-0.5">
+              SILK SAMAGRA MIS PORTAL
+            </h3>
+            <p className="text-center text-sm mb-5" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              Monthly MIS Reporting System
+            </p>
 
-          {/* Cocoon image */}
-          <img src={loginBg} alt="Silk cocoon with mulberry leaves"
-            className="relative z-10 object-contain"
-            style={{
-              width: '80%',
-              maxWidth: '380px',
-              filter: 'drop-shadow(0 24px 56px rgba(0,0,0,0.55)) brightness(1.05) saturate(1.2)',
-            }}
-          />
-
-          {/* Bottom label */}
-          <div className="relative z-10 mt-6 px-5 py-2 rounded-full text-[11px] font-bold tracking-widest uppercase"
-            style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              color: 'rgba(255,255,255,0.55)',
-              letterSpacing: '0.12em',
-            }}>
-            Sericulture · Tamil Nadu
+            <div className="flex flex-col gap-3">
+              {FEATURES.map(f => (
+                <div key={f} className="flex items-center gap-3">
+                  <CheckCircle2 size={18} className="shrink-0" style={{ color: '#4ade80' }} />
+                  <span className="text-sm font-medium text-white">{f}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
