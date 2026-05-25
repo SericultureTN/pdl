@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Activity, Building2, ChevronDown, FileText, Package, Cpu, Factory, BarChart3, Settings, Menu, X } from 'lucide-react';
+import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Activity, Building2, ChevronDown, FileText, BarChart3, Settings, Menu, X, Bell, Search, Shield, Database, Zap } from 'lucide-react';
 import { authService } from '../services/auth.js';
 import { sericulturistService } from "../services/sericulturist.js";
 import UserList from "./UserList.jsx";
@@ -176,20 +176,6 @@ export default function Dashboard({ user, onLogout }) {
     // Add actual download logic here
   };
 
-  const StatCard = ({ icon, title, value, subtitle, color, trend }) => (
-    <div className={`stat-card ${color}`}>
-      <div className="stat-icon">
-        {icon}
-      </div>
-      <div className="stat-content">
-        <h3>{title}</h3>
-        <div className="stat-value">{value}</div>
-        {subtitle && <div className="stat-subtitle">{subtitle}</div>}
-        {trend && <div className="stat-trend">{trend}</div>}
-      </div>
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="dashboard-loading">
@@ -199,408 +185,352 @@ export default function Dashboard({ user, onLogout }) {
     );
   }
 
+  /* ── Sidebar nav items ── */
+  const navItems = [
+    { id: 'overview',           label: 'Overview',  icon: <Activity size={18} />,  show: true },
+    { id: 'users',              label: 'Users',     icon: <Users size={18} />,     show: canManageUsers(user?.role) },
+    { id: 'sections-trigger',   label: 'Sections',  icon: <Building2 size={18} />, show: true, hasDropdown: true },
+    { id: 'reports-trigger',    label: 'Reports',   icon: <FileText size={18} />,  show: true, hasDropdown: true },
+    { id: 'settings',           label: 'Settings',  icon: <Settings size={18} />,  show: true },
+  ];
+
   return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div className="header-content">
-          <div className="header-left">
-            <h1>PDL Admin Dashboard</h1>
-            <p>Enterprise Management System</p>
+    <div className="db-root">
+
+      {/* ══════════════════════════════════
+          SIDEBAR
+      ══════════════════════════════════ */}
+      <aside className="db-sidebar">
+        {/* Logo area */}
+        <div className="db-sidebar-logo">
+          <div className="db-logo-mark">P</div>
+          <div className="db-logo-text">
+            <span className="db-logo-title">PDL</span>
+            <span className="db-logo-sub">ADMIN PANEL</span>
           </div>
-          
-          <div className="header-right">
-            {/* Mobile Menu Toggle */}
-            <button 
-              className="mobile-menu-toggle" 
-              onClick={toggleMobileMenu}
-              aria-label="Toggle mobile menu"
+        </div>
+
+        {/* Nav */}
+        <nav className="db-sidebar-nav">
+          <p className="db-nav-label">MAIN MENU</p>
+
+          {/* Overview */}
+          <button
+            className={`db-nav-item ${activeView === 'overview' ? 'active' : ''}`}
+            onClick={() => { setActiveView('overview'); setShowSectionDropdown(false); setShowReportsDropdown(false); }}
+          >
+            <span className="db-nav-icon"><Activity size={18} /></span>
+            <span>Overview</span>
+          </button>
+
+          {/* Users */}
+          {canManageUsers(user?.role) && (
+            <button
+              className={`db-nav-item ${activeView === 'users' ? 'active' : ''}`}
+              onClick={() => { setActiveView('users'); setShowSectionDropdown(false); setShowReportsDropdown(false); }}
             >
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              <span className="db-nav-icon"><Users size={18} /></span>
+              <span>Users</span>
             </button>
-            
-            {/* User Menu Dropdown - Click to open */}
+          )}
+
+          {/* Sections dropdown */}
+          <div className="db-nav-group">
+            <button
+              className={`db-nav-item ${showSectionDropdown ? 'active' : ''}`}
+              onClick={() => { setShowSectionDropdown(!showSectionDropdown); setShowReportsDropdown(false); }}
+            >
+              <span className="db-nav-icon"><Building2 size={18} /></span>
+              <span>Sections</span>
+              <ChevronDown size={14} className={`db-chevron ${showSectionDropdown ? 'open' : ''}`} />
+            </button>
+            {showSectionDropdown && (
+              <div className="db-sub-menu">
+                {user?.role === ROLES.SECTION_ADMIN ? (
+                  user?.ad_office && (
+                    <button className="db-sub-item" onClick={() => { handleReportSelect(user.ad_office); setShowSectionDropdown(false); }}>
+                      {user.ad_office}
+                    </button>
+                  )
+                ) : (
+                  REPORT_TYPES.map(r => (
+                    <button key={r} className="db-sub-item" onClick={() => { handleReportSelect(r); setShowSectionDropdown(false); }}>
+                      {r} Report
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Reports dropdown */}
+          <div className="db-nav-group">
+            <button
+              className={`db-nav-item ${activeView === 'reports-dashboard' || showReportsDropdown ? 'active' : ''}`}
+              onClick={() => { setShowReportsDropdown(!showReportsDropdown); setShowSectionDropdown(false); }}
+            >
+              <span className="db-nav-icon"><BarChart3 size={18} /></span>
+              <span>Reports</span>
+              <ChevronDown size={14} className={`db-chevron ${showReportsDropdown ? 'open' : ''}`} />
+            </button>
+            {showReportsDropdown && (
+              <div className="db-sub-menu">
+                <button className="db-sub-item" onClick={() => { setActiveView('reports-dashboard'); setShowReportsDropdown(false); }}>
+                  All Reports Dashboard
+                </button>
+                <div className="db-sub-divider" />
+                {user?.role === ROLES.USER ? (
+                  user?.ad_office && (
+                    <button className="db-sub-item" onClick={() => { handleReportSelect(user.ad_office); setShowReportsDropdown(false); }}>
+                      {user.ad_office} Office
+                    </button>
+                  )
+                ) : (
+                  ALL_REPORT_TYPES.map(r => (
+                    <button key={r} className="db-sub-item" onClick={() => { handleReportView(r); setShowReportsDropdown(false); }}>
+                      {r} Dashboard
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Settings */}
+          <button
+            className={`db-nav-item ${activeView === 'settings' ? 'active' : ''}`}
+            onClick={() => { setActiveView('settings'); setShowSectionDropdown(false); setShowReportsDropdown(false); }}
+          >
+            <span className="db-nav-icon"><Settings size={18} /></span>
+            <span>Settings</span>
+          </button>
+        </nav>
+
+        {/* Sidebar footer version card */}
+        <div className="db-sidebar-footer">
+          <div className="db-version-card">
+            <Shield size={14} />
+            <div>
+              <p className="db-version-name">PDL Admin Panel</p>
+              <p className="db-version-num">Version 1.0.0</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* ══════════════════════════════════
+          MAIN COLUMN
+      ══════════════════════════════════ */}
+      <div className="db-main-col">
+
+        {/* TOP HEADER */}
+        <header className="db-topbar">
+          <div className="db-topbar-left">
+            {/* Mobile toggle */}
+            <button className="db-mobile-toggle" onClick={toggleMobileMenu} aria-label="Toggle menu">
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <div>
+              <h1 className="db-topbar-title">PDL Admin Dashboard</h1>
+              <p className="db-topbar-sub">Enterprise Management System</p>
+            </div>
+          </div>
+
+          <div className="db-topbar-right">
+            {/* Search */}
+            <button className="db-icon-btn" aria-label="Search">
+              <Search size={18} />
+            </button>
+
+            {/* Bell */}
+            <div className="db-bell-wrap">
+              <button className="db-icon-btn" aria-label="Notifications">
+                <Bell size={18} />
+              </button>
+              <span className="db-bell-badge">3</span>
+            </div>
+
+            {/* Profile */}
             <div className="user-menu-wrapper">
-              <div
-                className="user-info"
-                onClick={() => setShowUserMenu(!showUserMenu)}
-              >
-                <User size={20} />
+              <div className="db-profile-card" onClick={() => setShowUserMenu(!showUserMenu)}>
+                <div className="db-avatar">
+                  <User size={16} />
+                </div>
                 <div className="user-info-text">
                   <span className="user-email">{user?.email}</span>
                   <span className="user-role">{getRoleDisplayName(user?.role)}</span>
-                  {user?.ad_office && (
-                    <span className="user-ad-office">{user.ad_office}</span>
-                  )}
                 </div>
-                <ChevronDown size={16} className={`dropdown-arrow ${showUserMenu ? 'open' : ''}`} />
+                <ChevronDown size={14} className={`dropdown-arrow ${showUserMenu ? 'open' : ''}`} />
               </div>
 
               {showUserMenu && (
                 <div className="user-dropdown">
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      setActiveView('settings');
-                      setShowUserMenu(false);
-                    }}
-                  >
-                    <Settings size={16} />
-                    Settings
+                  <button className="dropdown-item" onClick={() => { setActiveView('settings'); setShowUserMenu(false); }}>
+                    <Settings size={15} /> Settings
                   </button>
-                  <div className="dropdown-divider"></div>
-                  <button
-                    className="dropdown-item logout-item"
-                    onClick={handleLogout}
-                  >
-                    <LogOut size={16} />
-                    Logout
+                  <div className="dropdown-divider" />
+                  <button className="dropdown-item logout-item" onClick={handleLogout}>
+                    <LogOut size={15} /> Logout
                   </button>
                 </div>
               )}
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Mobile Navigation Overlay */}
-      {mobileMenuOpen && (
-        <div className="mobile-nav-overlay" onClick={toggleMobileMenu}>
-          <div className="mobile-nav-menu" onClick={(e) => e.stopPropagation()}>
-            <div className="mobile-nav-header">
-              <h3>Navigation</h3>
-              <button className="mobile-nav-close" onClick={toggleMobileMenu}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="mobile-nav-items">
-              <button
-                className={`mobile-nav-item ${activeView === 'overview' ? 'active' : ''}`}
-                onClick={() => handleMobileNavClick('overview')}
-              >
-                <Activity size={20} />
-                <span>Overview</span>
-              </button>
-              
-              {canManageUsers(user?.role) && (
-                <button
-                  className={`mobile-nav-item ${activeView === 'users' ? 'active' : ''}`}
-                  onClick={() => handleMobileNavClick('users')}
-                >
-                  <Users size={20} />
-                  <span>Users</span>
+        {/* Mobile nav overlay */}
+        {mobileMenuOpen && (
+          <div className="mobile-nav-overlay" onClick={toggleMobileMenu}>
+            <div className="mobile-nav-menu" onClick={e => e.stopPropagation()}>
+              <div className="mobile-nav-header">
+                <h3>Navigation</h3>
+                <button className="mobile-nav-close" onClick={toggleMobileMenu}><X size={20} /></button>
+              </div>
+              <div className="mobile-nav-items">
+                <button className={`mobile-nav-item ${activeView === 'overview' ? 'active' : ''}`} onClick={() => handleMobileNavClick('overview')}>
+                  <Activity size={18} /><span>Overview</span>
                 </button>
-              )}
-              
-              <div className="mobile-nav-section">
-                <h4>Sections</h4>
-                {REPORT_TYPES.map(report => (
-                  <button
-                    key={report}
-                    className="mobile-nav-item"
-                    onClick={() => handleReportSelect(report)}
-                  >
-                    <Building2 size={20} />
-                    <span>{report} Report</span>
+                {canManageUsers(user?.role) && (
+                  <button className={`mobile-nav-item ${activeView === 'users' ? 'active' : ''}`} onClick={() => handleMobileNavClick('users')}>
+                    <Users size={18} /><span>Users</span>
                   </button>
-                ))}
+                )}
+                <div className="mobile-nav-section">
+                  <h4>Sections</h4>
+                  {REPORT_TYPES.map(r => (
+                    <button key={r} className="mobile-nav-item" onClick={() => handleReportSelect(r)}>
+                      <Building2 size={18} /><span>{r} Report</span>
+                    </button>
+                  ))}
+                </div>
+                <button className={`mobile-nav-item ${activeView === 'reports-dashboard' ? 'active' : ''}`} onClick={() => handleMobileNavClick('reports-dashboard')}>
+                  <FileText size={18} /><span>Reports</span>
+                </button>
+                <button className={`mobile-nav-item ${activeView === 'settings' ? 'active' : ''}`} onClick={() => handleMobileNavClick('settings')}>
+                  <Settings size={18} /><span>Settings</span>
+                </button>
               </div>
-              
-              <button
-                className={`mobile-nav-item ${activeView === 'reports-dashboard' ? 'active' : ''}`}
-                onClick={() => handleMobileNavClick('reports-dashboard')}
-              >
-                <FileText size={20} />
-                <span>Reports</span>
-              </button>
-              
-              <button
-                className={`mobile-nav-item ${activeView === 'settings' ? 'active' : ''}`}
-                onClick={() => handleMobileNavClick('settings')}
-              >
-                <Settings size={20} />
-                <span>Settings</span>
-              </button>
             </div>
           </div>
-        </div>
-      )}
-
-      <nav className="dashboard-nav" style={{ borderTop: 'none' }}>
-        <button
-          className={`nav-btn ${activeView === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveView('overview')}
-        >
-          <Activity size={16} />
-          Overview
-        </button>
-        
-        {canManageUsers(user?.role) && (
-          <button
-            className={`nav-btn ${activeView === 'users' ? 'active' : ''}`}
-            onClick={() => setActiveView('users')}
-          >
-            <Users size={16} />
-            Users
-          </button>
         )}
-        
-        {/* Sections dropdown - Section Admin sees only their section, Super Admin sees all */}
-        <div className="nav-dropdown-wrapper">
-          <button
-            className={`nav-btn ${activeView === 'ad-offices' ? 'active' : ''}`}
-            onClick={() => {
-              setShowSectionDropdown(!showSectionDropdown);
-              setShowReportsDropdown(false);
-            }}
-          >
-            <Building2 size={16} />
-            Sections
-            <ChevronDown size={14} className={`dropdown-arrow ${showSectionDropdown ? 'open' : ''}`} />
-          </button>
 
-          {showSectionDropdown && (
-            <div className="nav-dropdown">
-              <div className="dropdown-header">
-                <Building2 size={16} />
-                <span>Section Reports</span>
+        {/* PAGE CONTENT */}
+        <main className="db-content">
+
+          {activeView === 'overview' && (
+            <div className="overview-view">
+
+              {/* Stat cards */}
+              <div className="stats-grid">
+                <div className="stat-card blue">
+                  <div className="stat-icon"><Users size={22} /></div>
+                  <div className="stat-content">
+                    <h3>Total Users</h3>
+                    <div className="stat-value">{statistics?.totalUsers || 0}</div>
+                    <div className="stat-subtitle">Registered users</div>
+                    <div className="stat-trend">+12% this month</div>
+                  </div>
+                </div>
+
+                <div className="stat-card green">
+                  <div className="stat-icon"><UserCheck size={22} /></div>
+                  <div className="stat-content">
+                    <h3>Active Users</h3>
+                    <div className="stat-value">{statistics?.activeUsers || 0}</div>
+                    <div className="stat-subtitle">{Math.round((statistics?.activeUsers || 0) / (statistics?.totalUsers || 1) * 100)}% of total</div>
+                    <div className="stat-trend">+8% this month</div>
+                  </div>
+                </div>
+
+                <div className="stat-card orange">
+                  <div className="stat-icon"><UserX size={22} /></div>
+                  <div className="stat-content">
+                    <h3>Inactive Users</h3>
+                    <div className="stat-value">{statistics?.inactiveUsers || 0}</div>
+                    <div className="stat-subtitle">Need attention</div>
+                    <div className="stat-trend stat-trend-neg">−3% this month</div>
+                  </div>
+                </div>
               </div>
-              {/* Section Admin sees only their assigned section, Super Admin sees all */}
-              {user?.role === ROLES.SECTION_ADMIN ? (
-                user?.ad_office && (
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      handleReportSelect(user.ad_office);
-                      setShowSectionDropdown(false);
-                    }}
-                  >
-                    {user.ad_office}
-                  </button>
-                )
-              ) : (
-                REPORT_TYPES.map(report => (
-                  <button
-                    key={report}
-                    className="dropdown-item"
-                    onClick={() => {
-                      handleReportSelect(report);
-                      setShowSectionDropdown(false);
-                    }}
-                  >
-                    {report}
-                  </button>
-                ))
-              )}
+
+              {/* Cards row */}
+              <div className="dashboard-cards">
+                {/* Server Info */}
+                <div className="card">
+                  <div className="card-header">
+                    <h3><Clock size={16} />Server Information</h3>
+                  </div>
+                  <div className="card-content">
+                    <div className="info-item">
+                      <label>Server Time</label>
+                      <span>{new Date(dashboardData?.serverTime).toLocaleString()}</span>
+                    </div>
+                    <div className="info-item">
+                      <label>Status</label>
+                      <span className="status-online">Online</span>
+                    </div>
+                    <div className="info-item">
+                      <label>Database</label>
+                      <span className="db-badge"><Database size={12} />PostgreSQL</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                <div className="card">
+                  <div className="card-header">
+                    <h3><Zap size={16} />Recent Activity</h3>
+                  </div>
+                  <div className="card-content">
+                    <div className="activity-item">
+                      <div className="activity-icon new-user" />
+                      <div className="activity-details">
+                        <strong>New registrations</strong>
+                        <span>{statistics?.recentGrowth || 0} users this month</span>
+                      </div>
+                    </div>
+                    <div className="activity-item">
+                      <div className="activity-icon active-user" />
+                      <div className="activity-details">
+                        <strong>Active users</strong>
+                        <span>{statistics?.activePercentage || 0}% engagement rate</span>
+                      </div>
+                    </div>
+                    <div className="activity-item">
+                      <div className="activity-icon system" />
+                      <div className="activity-details">
+                        <strong>System status</strong>
+                        <span>All systems operational</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* System message */}
+              <div className="card full-width">
+                <div className="card-header"><h3>System Message</h3></div>
+                <div className="card-content"><p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>{dashboardData?.message}</p></div>
+              </div>
+
             </div>
           )}
-        </div>
 
-        <div className="nav-dropdown-wrapper">
-          <button
-            className={`nav-btn ${activeView === 'reports-dashboard' ? 'active' : ''}`}
-            onClick={() => {
-              setShowReportsDropdown(!showReportsDropdown);
-              setShowSectionDropdown(false);
-            }}
-          >
-            <FileText size={16} />
-            Reports
-            <ChevronDown size={14} className={`dropdown-arrow ${showReportsDropdown ? 'open' : ''}`} />
-          </button>
-          
-          {showReportsDropdown && (
-            <div className="nav-dropdown">
-              <div className="dropdown-header">
-                <FileText size={16} />
-                <span>Report Options</span>
-              </div>
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  setActiveView('reports-dashboard');
-                  setShowReportsDropdown(false);
-                }}
-              >
-                📊 All Reports Dashboard
-              </button>
-              <div className="dropdown-divider"></div>
-              {/* Regular users see AD Offices, Admin users see Sections */}
-              {user?.role === ROLES.USER ? (
-                // Regular user - show their AD Office
-                user?.ad_office && (
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      handleReportSelect(user.ad_office);
-                      setShowReportsDropdown(false);
-                    }}
-                  >
-                    {user.ad_office} Office
-                  </button>
-                )
-              ) : (
-                // Super Admin and Section Admin see all reports
-                ALL_REPORT_TYPES.map(report => (
-                  <button
-                    key={report}
-                    className="dropdown-item"
-                    onClick={() => {
-                      handleReportView(report);
-                      setShowReportsDropdown(false);
-                    }}
-                  >
-                    {report} Dashboard
-                  </button>
-                ))
-              )}
+          {activeView === 'users' && canManageUsers(user?.role) && (
+            <div className="users-view">
+              <UserList userRole={user?.role} userAdOffice={user?.ad_office} canDelete={canDeleteUsers(user?.role)} canCreate={canCreateUsers(user?.role)} />
             </div>
           )}
-        </div>
 
-        <button
-          className={`nav-btn ${activeView === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveView('settings')}
-        >
-          <Settings size={16} />
-          Settings
-        </button>
-        
-      </nav>
+          {activeView === 'mis'              && <MISDashboard user={user} />}
+          {activeView === 'pls'              && <PLSDashboard user={user} />}
+          {activeView === 'prc'              && <PRCDashboard user={user} />}
+          {activeView === 'poc'              && <POCDashboard user={user} />}
+          {activeView === 'reports-dashboard'&& <ReportsDashboard user={user} />}
+          {activeView === 'settings'         && <UserSettings user={user} onBack={() => setActiveView('overview')} />}
 
-      <main className="dashboard-main">
-        {activeView === 'overview' && (
-          <div className="overview-view">
-            <div className="stats-grid">
-              <StatCard
-                icon={<Users size={24} />}
-                title="Total Users"
-                value={statistics?.totalUsers || 0}
-                subtitle="Registered users"
-                color="blue"
-              />
-              
-              <StatCard
-                icon={<UserCheck size={24} />}
-                title="Active Users"
-                value={statistics?.activeUsers || 0}
-                subtitle={`${Math.round((statistics?.activeUsers || 0) / (statistics?.totalUsers || 1) * 100)}% of total`}
-                color="green"
-              />
-              
-              <StatCard
-                icon={<UserX size={24} />}
-                title="Inactive Users"
-                value={statistics?.inactiveUsers || 0}
-                subtitle="Need attention"
-                color="orange"
-              />
-              
-              </div>
-
-            <div className="dashboard-cards">
-              <div className="card">
-                <div className="card-header">
-                  <h3>
-                    <Clock size={18} />
-                    Server Information
-                  </h3>
-                </div>
-                <div className="card-content">
-                  <div className="info-item">
-                    <label>Server Time:</label>
-                    <span>{new Date(dashboardData?.serverTime).toLocaleString()}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Status:</label>
-                    <span className="status-online">Online</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Database:</label>
-                    <span>PostgreSQL</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card-header">
-                  <h3>
-                    <Calendar size={18} />
-                    Recent Activity
-                  </h3>
-                </div>
-                <div className="card-content">
-                  <div className="activity-item">
-                    <div className="activity-icon new-user"></div>
-                    <div className="activity-details">
-                      <strong>New registrations</strong>
-                      <span>{statistics?.recentGrowth || 0} users this month</span>
-                    </div>
-                  </div>
-                  <div className="activity-item">
-                    <div className="activity-icon active-user"></div>
-                    <div className="activity-details">
-                      <strong>Active users</strong>
-                      <span>{statistics?.activePercentage || 0}% engagement rate</span>
-                    </div>
-                  </div>
-                  <div className="activity-item">
-                    <div className="activity-icon system"></div>
-                    <div className="activity-details">
-                      <strong>System status</strong>
-                      <span>All systems operational</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card full-width">
-              <div className="card-header">
-                <h3>System Message</h3>
-              </div>
-              <div className="card-content">
-                <p>{dashboardData?.message}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeView === 'users' && canManageUsers(user?.role) && (
-          <div className="users-view">
-            <UserList 
-              userRole={user?.role} 
-              userAdOffice={user?.ad_office}
-              canDelete={canDeleteUsers(user?.role)}
-              canCreate={canCreateUsers(user?.role)}
-            />
-          </div>
-        )}
-
-        {activeView === 'mis' && (
-          <MISDashboard user={user} />
-        )}
-
-        {activeView === 'pls' && (
-          <PLSDashboard user={user} />
-        )}
-
-        {activeView === 'prc' && (
-          <PRCDashboard user={user} />
-        )}
-
-        {activeView === 'poc' && (
-          <POCDashboard user={user} />
-        )}
-
-        {activeView === 'reports-dashboard' && (
-          <ReportsDashboard user={user} />
-        )}
-
-        {activeView === 'settings' && (
-          <UserSettings user={user} onBack={() => setActiveView('overview')} />
-        )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
