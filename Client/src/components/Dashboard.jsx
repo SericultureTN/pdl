@@ -4,7 +4,6 @@ import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Act
 import { authService } from '../services/auth.js';
 import { sericulturistService } from "../services/sericulturist.js";
 import UserList from "./UserList.jsx";
-import MISDashboard from "./MISDashboard.jsx";
 import MISPage from "../pages/MISPage.jsx";
 import PLSDashboard from "./PLSDashboard.jsx";
 import PRCDashboard from "./PRCDashboard.jsx";
@@ -523,7 +522,7 @@ export default function Dashboard({ user, onLogout }) {
             </div>
           )}
 
-          {activeView === 'mis'              && <MISPage user={user} onBack={() => setActiveView('overview')} />}
+          {/* MIS handled by early return above */}
           {activeView === 'pls'              && <PLSDashboard user={user} />}
           {activeView === 'prc'              && <PRCDashboard user={user} />}
           {activeView === 'poc'              && <POCDashboard user={user} />}

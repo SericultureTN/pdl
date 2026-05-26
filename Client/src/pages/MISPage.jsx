@@ -52,7 +52,7 @@ export default function MISPage({ user, onBack }) {
   const navigate = useNavigate();
   const goBack = onBack || (() => navigate("/"));
   const [activeView, setActiveView] = useState("dashboard");
-  const [dataEntryOpen, setDataEntryOpen] = useState(false);
+  const [dataEntryOpen, setDataEntryOpen] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedYear, setSelectedYear] = useState("2025-26");
 
@@ -64,9 +64,6 @@ export default function MISPage({ user, onBack }) {
   const handleNav = (id, hasChildren) => {
     if (hasChildren) { setDataEntryOpen(o => !o); return; }
     setActiveView(id);
-    if (!NAV_ITEMS.find(n => n.id === "data-entry")?.children?.find(c => c.id === id)) {
-      setDataEntryOpen(false);
-    }
   };
 
   const isDataEntryChild = NAV_ITEMS.find(n => n.id === "data-entry")
