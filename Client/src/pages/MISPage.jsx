@@ -1,12 +1,11 @@
 import { useState } from "react";
 import {
-  LayoutDashboard, BarChart3, LogOut,
+  LayoutDashboard, LogOut,
   Bell, Menu, Leaf, Calendar
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PlantationOverallPage      from "../components/mis/PlantationOverallPage.jsx";
 import PlantationSchemePage       from "../components/mis/PlantationSchemePage.jsx";
-import PlantationSchemeReportPage from "../components/mis/PlantationSchemeReportPage.jsx";
 import DFLsDistributionPage       from "../components/mis/DFLsDistributionPage.jsx";
 import DFLsConsumptionPage        from "../components/mis/DFLsConsumptionPage.jsx";
 import CocoonProductionPage       from "../components/mis/CocoonProductionPage.jsx";
@@ -30,8 +29,7 @@ const DATA_ENTRY_VIEWS = [
 ];
 
 const SIDEBAR_NAV = [
-  { id: "dashboard",                label: "Dashboard", icon: LayoutDashboard },
-  { id: "plantation-scheme-report", label: "Reports",   icon: BarChart3 },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
 ];
 
 export default function MISPage({ user, onBack }) {
@@ -42,23 +40,11 @@ export default function MISPage({ user, onBack }) {
   const [selectedYear, setSelectedYear] = useState("2025-26");
 
   /* Full-screen early returns */
-  if (activeView === "plantation-scheme-report") {
-    return (
-      <PlantationSchemeReportPage
-        user={user}
-        onBack={() => setActiveView("dashboard")}
-        onDataEntry={id => setActiveView(id)}
-      />
-    );
-  }
-
   if (DATA_ENTRY_VIEWS.includes(activeView)) {
     const back = () => setActiveView("dashboard");
     if (activeView === "plantation-overall") return <PlantationOverallPage user={user} onBack={back} />;
-    if (activeView === "plantation-2024")    return <PlantationSchemePage year="2024-25" user={user} onBack={back}
-      storageKey="Plantation Scheme 2024-25" onViewReport={() => setActiveView("plantation-scheme-report")} />;
-    if (activeView === "plantation-2025")    return <PlantationSchemePage year="2025-26" user={user} onBack={back}
-      storageKey="Plantation Scheme 2025-26" onViewReport={() => setActiveView("plantation-scheme-report")} />;
+    if (activeView === "plantation-2024")    return <PlantationSchemePage year="2024-25" user={user} onBack={back} />;
+    if (activeView === "plantation-2025")    return <PlantationSchemePage year="2025-26" user={user} onBack={back} />;
     if (activeView === "dfls-distribution")  return <DFLsDistributionPage  user={user} onBack={back} />;
     if (activeView === "dfls-consumption")   return <DFLsConsumptionPage   user={user} onBack={back} />;
     if (activeView === "cocoon-production")  return <CocoonProductionPage   user={user} onBack={back} />;
