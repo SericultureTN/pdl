@@ -204,7 +204,8 @@ export function UMCard({ sections, unit, data }) {
      onBack      : fn
 ───────────────────────────────────────────────────────────────*/
 export default function MISEntryTemplate({
-  pageTitle, breadcrumb, unit, sections, defaultData, activeNavId, user, onBack
+  pageTitle, breadcrumb, unit, sections, defaultData, activeNavId, user, onBack,
+  renderFilters
 }) {
   const [sidebarOpen,    setSidebarOpen]    = useState(false);
   const [dataEntryOpen,  setDataEntryOpen]  = useState(true);
@@ -383,25 +384,29 @@ export default function MISEntryTemplate({
               <span className="dfls-unit-badge">Unit: {unit}</span>
             </div>
 
-            <div className="dfls-filter-row">
-              {[
-                { label:"AD Office",      key:"adOffice",  opts: AD_OFFICES },
-                { label:"Region",         key:"region",    opts: REGIONS    },
-                { label:"Financial Year", key:"finYear",   opts: FIN_YEARS  },
-                { label:"Month",          key:"month",     opts: MONTHS     },
-                { label:"Scheme",         key:"scheme",    opts: SCHEMES    },
-              ].map(f => (
-                <div className="dfls-filter-field" key={f.key}>
-                  <label>{f.label}</label>
-                  <div className="dfls-select-wrap">
-                    <select value={filters[f.key]} onChange={e => setFilters(p => ({ ...p, [f.key]: e.target.value }))}>
-                      {f.opts.map(o => <option key={o}>{o}</option>)}
-                    </select>
-                    <ChevronDown size={13} />
+            {renderFilters
+              ? renderFilters()
+              : (
+              <div className="dfls-filter-row">
+                {[
+                  { label:"AD Office",      key:"adOffice",  opts: AD_OFFICES },
+                  { label:"Region",         key:"region",    opts: REGIONS    },
+                  { label:"Financial Year", key:"finYear",   opts: FIN_YEARS  },
+                  { label:"Month",          key:"month",     opts: MONTHS     },
+                  { label:"Scheme",         key:"scheme",    opts: SCHEMES    },
+                ].map(f => (
+                  <div className="dfls-filter-field" key={f.key}>
+                    <label>{f.label}</label>
+                    <div className="dfls-select-wrap">
+                      <select value={filters[f.key]} onChange={e => setFilters(p => ({ ...p, [f.key]: e.target.value }))}>
+                        {f.opts.map(o => <option key={o}>{o}</option>)}
+                      </select>
+                      <ChevronDown size={13} />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div className="dfls-cf-banner">
               <Info size={15} className="dfls-cf-icon" />
