@@ -19,7 +19,9 @@ const SECTIONS = [
   },
   {
     title: "P1",
-    rows: [{ key: "p1", label: "Value" }],
+    rows: [
+      { key: "p1", label: "Value" },
+    ],
   },
 ];
 

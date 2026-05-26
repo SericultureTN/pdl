@@ -2,7 +2,7 @@ import MISEntryTemplate from "./MISEntryTemplate.jsx";
 
 const SECTIONS = [
   {
-    title: "BV",
+    title: "Bivoltine",
     rows: [
       { key: "bv_govt",  label: "Govt" },
       { key: "bv_nsso",  label: "NSSO" },
@@ -11,7 +11,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: "CB",
+    title: "Cross Breed",
     rows: [
       { key: "cb_other", label: "Other State" },
       { key: "cb_nsso",  label: "NSSO" },
@@ -19,29 +19,31 @@ const SECTIONS = [
   },
   {
     title: "P1",
-    rows: [{ key: "p1", label: "Value" }],
+    rows: [
+      { key: "p1", label: "Value" },
+    ],
   },
 ];
 
 const DEFAULT_DATA = {
-  bv_govt:  { ulm: 120 },
-  bv_nsso:  { ulm: 200 },
-  bv_tnpvt: { ulm: 150 },
-  bv_other: { ulm: 40  },
-  cb_other: { ulm: 80  },
-  cb_nsso:  { ulm: 40  },
-  p1:       { ulm: 220 },
+  bv_govt:  { ulm: 8500  },
+  bv_nsso:  { ulm: 12400 },
+  bv_tnpvt: { ulm: 9600  },
+  bv_other: { ulm: 3200  },
+  cb_other: { ulm: 4800  },
+  cb_nsso:  { ulm: 2200  },
+  p1:       { ulm: 7800  },
 };
 
-export default function DFLsDistributionPage({ user, onBack }) {
+export default function CocoonProductionPage({ user, onBack }) {
   return (
     <MISEntryTemplate
-      pageTitle="DFLs Distribution"
-      breadcrumb="DFLs Distribution"
-      unit="Nos"
+      pageTitle="Cocoon Production"
+      breadcrumb="Cocoon Production"
+      unit="Kg"
       sections={SECTIONS}
       defaultData={DEFAULT_DATA}
-      activeNavId="dfls-distribution"
+      activeNavId="cocoon-production"
       user={user}
       onBack={onBack}
     />

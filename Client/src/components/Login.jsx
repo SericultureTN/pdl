@@ -128,7 +128,7 @@ export default function Login({ onLogin }) {
             {/* Sign In */}
             <button type="submit" disabled={loading}
               className="w-full py-3 rounded-lg text-white font-bold text-sm tracking-wide transition-all duration-200 mt-1"
-              style={{ background: loading ? '#4a9e75' : '#0B5D3B' }}
+              style={{ background: loading ? '#4a9e75' : '#0B5D3B' }} 
               onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#094d31'; }}
               onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#0B5D3B'; }}>
               {loading
