@@ -1,9 +1,7 @@
 import { useState } from "react";
 import {
   LayoutDashboard, BarChart3, LogOut,
-  ChevronRight, Bell, Menu, Leaf, TrendingUp, Activity,
-  Calendar, CheckCircle2, Clock, AlertCircle, Database,
-  ClipboardList, Users
+  Bell, Menu, Leaf, Calendar
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PlantationOverallPage      from "../components/mis/PlantationOverallPage.jsx";
@@ -165,93 +163,6 @@ export default function MISPage({ user, onBack }) {
   );
 }
 
-/* ── Dashboard overview content ── */
-function MISDashboardOverview({ setActiveView }) {
-  const stats = [
-    { label:"Plantation Records", value:"3,842",    change:"+124 this month",    icon:Leaf,       color:"green"  },
-    { label:"DFLs Distributed",   value:"1,26,540", change:"+8,200 this month",  icon:Activity,   color:"blue"   },
-    { label:"Cocoon Production",   value:"48.6 MT",  change:"+3.2 MT this month", icon:TrendingUp, color:"orange" },
-    { label:"Farmers Covered",     value:"9,214",    change:"+312 this month",    icon:Users,      color:"purple" },
-  ];
-
-  const quickLinks = [
-    { id:"plantation-overall", label:"Plantation Overall",        icon:Leaf          },
-    { id:"plantation-2024",    label:"Plantation Scheme 2024-25", icon:ClipboardList },
-    { id:"plantation-2025",    label:"Plantation Scheme 2025-26", icon:ClipboardList },
-    { id:"dfls-distribution",  label:"DFLs Distribution",         icon:Activity      },
-    { id:"dfls-consumption",   label:"DFLs Consumption",          icon:Database      },
-    { id:"cocoon-production",  label:"Cocoon Production",         icon:TrendingUp    },
-  ];
-
-  const recent = [
-    { label:"Plantation Overall - April 2025",  status:"submitted", time:"2 hrs ago"  },
-    { label:"DFLs Distribution - March 2025",   status:"pending",   time:"5 hrs ago"  },
-    { label:"Cocoon Production - March 2025",   status:"submitted", time:"Yesterday"  },
-    { label:"Plantation Scheme 2024-25 - Q4",   status:"draft",     time:"2 days ago" },
-  ];
-
-  const statusIcon = s =>
-    s === "submitted" ? <CheckCircle2 size={13} className="gov-status-submitted" /> :
-    s === "pending"   ? <Clock        size={13} className="gov-status-pending"   /> :
-                        <AlertCircle  size={13} className="gov-status-draft"     />;
-
-  return (
-    <div className="gov-overview">
-      <div className="gov-page-title">
-        <h2>Dashboard Overview</h2>
-        <p>Silk Samagra MIS Portal — Monthly sericulture data reporting</p>
-      </div>
-
-      <div className="gov-stats-grid">
-        {stats.map((s, i) => {
-          const Icon = s.icon;
-          return (
-            <div key={i} className={`gov-stat-card gov-stat-${s.color}`}>
-              <div className="gov-stat-icon"><Icon size={22} /></div>
-              <div className="gov-stat-body">
-                <p className="gov-stat-label">{s.label}</p>
-                <h3 className="gov-stat-value">{s.value}</h3>
-                <span className="gov-stat-change">{s.change}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="gov-overview-grid">
-        <div className="gov-card">
-          <div className="gov-card-head"><h4>Data Entry</h4></div>
-          <div className="gov-quick-links">
-            {quickLinks.map(q => {
-              const Icon = q.icon;
-              return (
-                <button key={q.id} className="gov-quick-btn" onClick={() => setActiveView(q.id)}>
-                  <Icon size={16} />
-                  <span>{q.label}</span>
-                  <ChevronRight size={14} className="gov-ql-arrow" />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="gov-card">
-          <div className="gov-card-head"><h4>Recent Entries</h4></div>
-          <div className="gov-recent-list">
-            {recent.map((e, i) => (
-              <div key={i} className="gov-recent-item">
-                <div className="gov-recent-info">
-                  <p>{e.label}</p>
-                  <span>{e.time}</span>
-                </div>
-                <span className={`gov-status-badge gov-status-${e.status}`}>
-                  {statusIcon(e.status)} {e.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function MISDashboardOverview() {
+  return null;
 }
