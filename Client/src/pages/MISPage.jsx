@@ -39,7 +39,7 @@ const NAV_ITEMS = [
       { id: "cocoon-production", label: "Cocoon Production" },
     ]
   },
-  { id: "reports", label: "Reports", icon: BarChart3 },
+  { id: "plantation-scheme-report", label: "Reports", icon: BarChart3 },
   { id: "mis-reports", label: "MIS Reports", icon: FileText },
   { id: "downloads", label: "Downloads", icon: Download },
   { id: "users", label: "User Management", icon: Users },
