@@ -205,7 +205,7 @@ export function UMCard({ sections, unit, data }) {
 ───────────────────────────────────────────────────────────────*/
 export default function MISEntryTemplate({
   pageTitle, breadcrumb, unit, sections, defaultData, activeNavId, user, onBack,
-  renderFilters
+  renderFilters, onViewReport, storageKey
 }) {
   const [sidebarOpen,    setSidebarOpen]    = useState(false);
   const [dataEntryOpen,  setDataEntryOpen]  = useState(true);
@@ -238,9 +238,23 @@ export default function MISEntryTemplate({
     setData(prev => calcAll({ ...prev, [key]: { ...prev[key], dm: val } }));
   }, []);
 
-  const handleReset    = () => setData(calcAll(buildInitial()));
-  const handleDraft    = () => alert("Draft saved successfully.");
-  const handleSubmit   = () => alert("Data submitted successfully.");
+  const handleReset  = () => setData(calcAll(buildInitial()));
+  const handleDraft  = () => alert("Draft saved successfully.");
+  const handleSubmit = () => {
+    const key = storageKey || pageTitle;
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    const record = {
+      id: Date.now(),
+      submittedAt: new Date().toLocaleString(),
+      filters: { ...filters },
+      data: { ...data },
+      unit,
+      sections,
+    };
+    localStorage.setItem(key, JSON.stringify([record, ...existing]));
+    alert("Data submitted successfully.");
+    if (onViewReport) onViewReport();
+  };
 
   const initials = (user?.name || "AS").split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2);
 
@@ -435,6 +449,12 @@ export default function MISEntryTemplate({
               </div>
             </div>
             <div className="dfls-action-btns">
+              {onViewReport && (
+                <button className="dfls-btn" onClick={onViewReport}
+                  style={{ background: "#f1f5f9", color: "#0B5D3B", border: "1.5px solid #0B5D3B", marginRight: 8 }}>
+                  <FileSpreadsheet size={13} style={{marginRight:5}} />View Reports
+                </button>
+              )}
               <button className="dfls-btn dfls-btn-reset"  onClick={handleReset}>
                 <RotateCcw size={13} style={{marginRight:5}} />Reset
               </button>

@@ -8,6 +8,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import PlantationOverallPage from "../components/mis/PlantationOverallPage.jsx";
 import PlantationSchemePage from "../components/mis/PlantationSchemePage.jsx";
+import PlantationSchemeReportPage from "../components/mis/PlantationSchemeReportPage.jsx";
 import DFLsDistributionPage from "../components/mis/DFLsDistributionPage.jsx";
 import DFLsConsumptionPage from "../components/mis/DFLsConsumptionPage.jsx";
 import CocoonProductionPage from "../components/mis/CocoonProductionPage.jsx";
@@ -73,11 +74,23 @@ export default function MISPage({ user, onBack }) {
 
   const DATA_ENTRY_VIEWS = ["plantation-overall","plantation-2024","plantation-2025","dfls-distribution","dfls-consumption","cocoon-production"];
 
+  if (activeView === "plantation-scheme-report") {
+    return (
+      <PlantationSchemeReportPage
+        user={user}
+        onBack={() => setActiveView("dashboard")}
+        onDataEntry={id => setActiveView(id)}
+      />
+    );
+  }
+
   if (DATA_ENTRY_VIEWS.includes(activeView)) {
     const back = () => setActiveView("dashboard");
     if (activeView === "plantation-overall") return <PlantationOverallPage user={user} onBack={back} />;
-    if (activeView === "plantation-2024")    return <PlantationSchemePage   year="2024-25" user={user} onBack={back} />;
-    if (activeView === "plantation-2025")    return <PlantationSchemePage   year="2025-26" user={user} onBack={back} />;
+    if (activeView === "plantation-2024")    return <PlantationSchemePage   year="2024-25" user={user} onBack={back}
+        storageKey="Plantation Scheme 2024-25" onViewReport={() => setActiveView("plantation-scheme-report")} />;
+    if (activeView === "plantation-2025")    return <PlantationSchemePage   year="2025-26" user={user} onBack={back}
+        storageKey="Plantation Scheme 2025-26" onViewReport={() => setActiveView("plantation-scheme-report")} />;
     if (activeView === "dfls-distribution")  return <DFLsDistributionPage   user={user} onBack={back} />;
     if (activeView === "dfls-consumption")   return <DFLsConsumptionPage    user={user} onBack={back} />;
     if (activeView === "cocoon-production")  return <CocoonProductionPage    user={user} onBack={back} />;
