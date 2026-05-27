@@ -31,8 +31,9 @@ function App() {
           setUser(null);
         }
       } catch (error) {
-        console.log('Not authenticated:', error.message);
-        if (!sessionStorage.getItem('pdl_user')) setUser(null);
+        console.log('Not authenticated:', error?.error || error?.message);
+        sessionStorage.removeItem('pdl_user');
+        setUser(null);
       } finally {
         setLoading(false);
         setAuthChecked(true);

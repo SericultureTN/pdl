@@ -400,6 +400,93 @@ app.get("/api/sericulturists", requireAnyUser, async (req, res) => {
   }
 });
 
+// Fixed paths before /:id (Express matches in registration order)
+app.get("/api/sericulturists/statistics", requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await sericulturistServices.getStatistics();
+
+    if (!result.ok) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json({ ok: true, statistics: result.statistics });
+  } catch (error) {
+    console.error('Get statistics error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.delete("/api/sericulturists/bulk", requireSuperAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    console.log('Bulk delete request received, IDs:', ids);
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      console.log('Invalid IDs array:', ids);
+      return res.status(400).json({ error: "IDs array is required" });
+    }
+
+    const validIds = ids
+      .map(id => typeof id === 'string' ? parseInt(id) : id)
+      .filter(id => typeof id === 'number' && !isNaN(id));
+    console.log('Valid IDs for deletion:', validIds);
+
+    if (validIds.length === 0) {
+      return res.status(400).json({ error: "No valid sericulturist IDs provided" });
+    }
+
+    const result = await sericulturistServices.bulkDelete(validIds);
+
+    if (!result.ok) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json({
+      ok: true,
+      message: `Deleted ${result.deletedCount} sericulturists`
+    });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.put("/api/sericulturists/bulk/status", requireSuperAdmin, async (req, res) => {
+  try {
+    const { ids, status } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "IDs array is required" });
+    }
+
+    if (!status || !['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ error: "Status must be 'active' or 'inactive'" });
+    }
+
+    const validIds = ids
+      .map(id => typeof id === 'string' ? parseInt(id) : id)
+      .filter(id => typeof id === 'number' && !isNaN(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({ error: "No valid sericulturist IDs provided" });
+    }
+
+    const result = await sericulturistServices.bulkUpdateStatus(validIds, status);
+
+    if (!result.ok) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    return res.json({
+      ok: true,
+      message: `Updated ${result.updatedCount} sericulturists`
+    });
+  } catch (error) {
+    console.error('Bulk update error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.get("/api/sericulturists/:id", requireAnyUser, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -551,80 +638,6 @@ app.put("/api/sericulturists/:id", requireSectionAdmin, async (req, res) => {
   }
 });
 
-// Bulk operations - Only Super Admin (MUST be before /:id routes)
-app.delete("/api/sericulturists/bulk", requireSuperAdmin, async (req, res) => {
-  try {
-    const { ids } = req.body;
-    console.log('Bulk delete request received, IDs:', ids);
-
-    if (!Array.isArray(ids) || ids.length === 0) {
-      console.log('Invalid IDs array:', ids);
-      return res.status(400).json({ error: "IDs array is required" });
-    }
-
-    // Validate and convert IDs to numbers
-    const validIds = ids
-      .map(id => typeof id === 'string' ? parseInt(id) : id)
-      .filter(id => typeof id === 'number' && !isNaN(id));
-    console.log('Valid IDs for deletion:', validIds);
-
-    if (validIds.length === 0) {
-      return res.status(400).json({ error: "No valid sericulturist IDs provided" });
-    }
-
-    const result = await sericulturistServices.bulkDelete(validIds);
-    
-    if (!result.ok) {
-      return res.status(500).json({ error: result.error });
-    }
-
-    return res.json({ 
-      ok: true, 
-      message: `Deleted ${result.deletedCount} sericulturists` 
-    });
-  } catch (error) {
-    console.error('Bulk delete error:', error);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-app.put("/api/sericulturists/bulk/status", requireSuperAdmin, async (req, res) => {
-  try {
-    const { ids, status } = req.body;
-
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: "IDs array is required" });
-    }
-
-    if (!status || !['active', 'inactive'].includes(status)) {
-      return res.status(400).json({ error: "Status must be 'active' or 'inactive'" });
-    }
-
-    // Validate and convert IDs to numbers
-    const validIds = ids
-      .map(id => typeof id === 'string' ? parseInt(id) : id)
-      .filter(id => typeof id === 'number' && !isNaN(id));
-
-    if (validIds.length === 0) {
-      return res.status(400).json({ error: "No valid sericulturist IDs provided" });
-    }
-
-    const result = await sericulturistServices.bulkUpdateStatus(validIds, status);
-    
-    if (!result.ok) {
-      return res.status(500).json({ error: result.error });
-    }
-
-    return res.json({ 
-      ok: true, 
-      message: `Updated ${result.updatedCount} sericulturists` 
-    });
-  } catch (error) {
-    console.error('Bulk update error:', error);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 app.delete("/api/sericulturists/:id", requireSuperAdmin, async (req, res) => {
   try {
     console.log('Delete request received, ID param:', req.params.id, 'Type:', typeof req.params.id);
@@ -645,22 +658,6 @@ app.delete("/api/sericulturists/:id", requireSuperAdmin, async (req, res) => {
     return res.json({ ok: true, message: "Sericulturist deleted successfully" });
   } catch (error) {
     console.error('Delete sericulturist error:', error);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// Statistics endpoint
-app.get("/api/sericulturists/statistics", requireSuperAdmin, async (req, res) => {
-  try {
-    const result = await sericulturistServices.getStatistics();
-    
-    if (!result.ok) {
-      return res.status(500).json({ error: result.error });
-    }
-
-    return res.json({ ok: true, statistics: result.statistics });
-  } catch (error) {
-    console.error('Get statistics error:', error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

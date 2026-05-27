@@ -32,7 +32,8 @@ export default function Login({ onLogin }) {
       if (result.ok) { onLogin(result.user); }
       else           { setError(result.error || 'Invalid credentials. Please try again.'); }
     } catch (err) {
-      setError(err.error || 'Login failed. Please try again.');
+      const msg = err?.error || err?.message;
+      setError(typeof msg === 'string' ? msg : 'Login failed. Please try again.');
     } finally { setLoading(false); }
   };
 
