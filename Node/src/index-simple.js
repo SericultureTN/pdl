@@ -8,15 +8,19 @@ import cookieParser from "cookie-parser";
 const app = express();
 
 const PORT = Number(process.env.PORT || 4000);
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
-
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: CORS_ORIGIN,
+    origin: function (origin, cb) {
+      // Allow any localhost/127.0.0.1 origin or no origin (e.g. Postman)
+      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return cb(null, true);
+      }
+      cb(new Error("Not allowed by CORS"));
+    },
     credentials: true
   })
 );
@@ -48,9 +52,11 @@ app.post("/api/admin/login", (req, res) => {
       path: "/",
       maxAge: 2 * 60 * 60 * 1000
     });
+    const userData = { id: adminUser.id, email: adminUser.email, name: "Admin", role: "super_admin" };
     return res.json({ 
       ok: true, 
-      admin: { id: adminUser.id, email: adminUser.email } 
+      admin: userData,
+      user: userData
     });
   }
 
@@ -73,7 +79,8 @@ const requireAdmin = (req, res, next) => {
 };
 
 app.get("/api/admin/me", requireAdmin, (req, res) => {
-  return res.json({ ok: true, admin: req.admin });
+  const userData = { ...req.admin, name: "Admin", role: "super_admin" };
+  return res.json({ ok: true, admin: userData, user: userData });
 });
 
 app.get("/api/admin/dashboard", requireAdmin, (req, res) => {

@@ -6,11 +6,11 @@ import {
   CheckCircle2, Clock, AlertCircle
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import PlantationOverall from "../components/mis/PlantationOverall.jsx";
-import PlantationScheme from "../components/mis/PlantationScheme.jsx";
+import PlantationOverallPage from "../components/mis/PlantationOverallPage.jsx";
+import PlantationSchemePage from "../components/mis/PlantationSchemePage.jsx";
 import DFLsDistributionPage from "../components/mis/DFLsDistributionPage.jsx";
-import DFLsConsumption from "../components/mis/DFLsConsumption.jsx";
-import CocoonProduction from "../components/mis/CocoonProduction.jsx";
+import DFLsConsumptionPage from "../components/mis/DFLsConsumptionPage.jsx";
+import CocoonProductionPage from "../components/mis/CocoonProductionPage.jsx";
 import "./mispage.css";
 
 /* ── inline style tokens ── */
@@ -71,29 +71,28 @@ export default function MISPage({ user, onBack }) {
   const isDataEntryChild = NAV_ITEMS.find(n => n.id === "data-entry")
     ?.children?.some(c => c.id === activeView);
 
-  const renderContent = () => {
-    switch (activeView) {
-      case "plantation-overall": return <PlantationOverall user={user} />;
-      case "plantation-2024": return <PlantationScheme year="2024-25" user={user} />;
-      case "plantation-2025": return <PlantationScheme year="2025-26" user={user} />;
-      case "dfls-distribution": return null;
-      case "dfls-consumption": return <DFLsConsumption user={user} />;
-      case "cocoon-production": return <CocoonProduction user={user} />;
-      case "dashboard": return <MISDashboardOverview setActiveView={setActiveView} />;
-      default:
-        return (
-          <div className="gov-placeholder">
-            <FileText size={56} />
-            <h3>{breadcrumbLabel()}</h3>
-            <p>This section is under development.</p>
-          </div>
-        );
-    }
-  };
+  const DATA_ENTRY_VIEWS = ["plantation-overall","plantation-2024","plantation-2025","dfls-distribution","dfls-consumption","cocoon-production"];
 
-  if (activeView === "dfls-distribution") {
-    return <DFLsDistributionPage user={user} onBack={() => setActiveView("dashboard")} />;
+  if (DATA_ENTRY_VIEWS.includes(activeView)) {
+    const back = () => setActiveView("dashboard");
+    if (activeView === "plantation-overall") return <PlantationOverallPage user={user} onBack={back} />;
+    if (activeView === "plantation-2024")    return <PlantationSchemePage year="2024-25" user={user} onBack={back} />;
+    if (activeView === "plantation-2025")    return <PlantationSchemePage year="2025-26" user={user} onBack={back} />;
+    if (activeView === "dfls-distribution")  return <DFLsDistributionPage  user={user} onBack={back} />;
+    if (activeView === "dfls-consumption")   return <DFLsConsumptionPage   user={user} onBack={back} />;
+    if (activeView === "cocoon-production")  return <CocoonProductionPage  user={user} onBack={back} />;
   }
+
+  const renderContent = () => {
+    if (activeView === "dashboard") return <MISDashboardOverview setActiveView={setActiveView} />;
+    return (
+      <div className="gov-placeholder">
+        <FileText size={56} />
+        <h3>{breadcrumbLabel()}</h3>
+        <p>This section is under development.</p>
+      </div>
+    );
+  };
 
   return (
     <div style={S.root}>
@@ -269,24 +268,9 @@ function MISDashboardOverview({ setActiveView }) {
         })}
       </div>
 
-      <div className="gov-overview-grid">
-        <div className="gov-card">
-          <div className="gov-card-head"><h4>Quick Data Entry</h4></div>
-          <div className="gov-quick-links">
-            {quickLinks.map(q => {
-              const Icon = q.icon;
-              return (
-                <button key={q.id} className="gov-quick-btn" onClick={() => setActiveView(q.id)}>
-                  <Icon size={16} />
-                  <span>{q.label}</span>
-                  <ChevronRight size={14} className="gov-ql-arrow" />
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      /
 
-        <div className="gov-card">
+        {/* <div className="gov-card">
           <div className="gov-card-head"><h4>Recent Entries</h4></div>
           <div className="gov-recent-list">
             {recentEntries.map((e, i) => (
@@ -301,8 +285,8 @@ function MISDashboardOverview({ setActiveView }) {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </div> */}
+      {/* </div> */}
     </div>
   );
 }
