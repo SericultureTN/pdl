@@ -80,6 +80,9 @@ async function initializeDatabase() {
         email TEXT UNIQUE,
         phone TEXT,
         address TEXT,
+        role TEXT,
+        ad_office TEXT,
+        password_hash TEXT,
         status TEXT DEFAULT 'active',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -94,6 +97,8 @@ async function initializeDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    await migrateSericulturistsTable();
 
     // Create default admin if not exists
     const existingAdmin = await db.get('SELECT id FROM admins WHERE email = ?', ['admin@example.com']);
@@ -143,6 +148,21 @@ async function initializeDatabase() {
   }
 }
 
+async function migrateSericulturistsTable() {
+  const columns = await db.all('PRAGMA table_info(sericulturists)');
+  const names = new Set(columns.map((column) => column.name));
+
+  if (!names.has('role')) {
+    await db.run('ALTER TABLE sericulturists ADD COLUMN role TEXT');
+  }
+  if (!names.has('ad_office')) {
+    await db.run('ALTER TABLE sericulturists ADD COLUMN ad_office TEXT');
+  }
+  if (!names.has('password_hash')) {
+    await db.run('ALTER TABLE sericulturists ADD COLUMN password_hash TEXT');
+  }
+}
+
 // Authentication middleware
 const requireAuth = async (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
@@ -179,6 +199,34 @@ const requireAuth = async (req, res, next) => {
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
+
+const requireAdmin = (req, res, next) => {
+  if (req.user?.type !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+};
+
+const SERICULTURIST_COLUMNS =
+  'id, name, email, phone, address, role, ad_office, status, created_at, updated_at';
+
+function buildSericulturistFilters(search, status) {
+  let where = 'WHERE 1=1';
+  const params = [];
+
+  if (search) {
+    where += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR ad_office LIKE ?)';
+    const term = `%${search}%`;
+    params.push(term, term, term, term);
+  }
+
+  if (status) {
+    where += ' AND status = ?';
+    params.push(status);
+  }
+
+  return { where, params };
+}
 
 // Health check
 app.get("/health", async (_req, res) => {
@@ -322,26 +370,59 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
   }
 });
 
-// Get all sericulturists
-app.get("/api/sericulturists", requireAuth, async (req, res) => {
+// Get statistics (must be registered before /:id)
+app.get("/api/sericulturists/statistics", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const [total, active, inactive] = await Promise.all([
+      db.get('SELECT COUNT(*) as count FROM sericulturists'),
+      db.get('SELECT COUNT(*) as count FROM sericulturists WHERE status = "active"'),
+      db.get('SELECT COUNT(*) as count FROM sericulturists WHERE status = "inactive"')
+    ]);
+
+    return res.json({
+      ok: true,
+      statistics: {
+        totalSericulturists: total.count,
+        activeSericulturists: active.count,
+        inactiveSericulturists: inactive.count,
+        newThisMonth: 0
+      }
+    });
+  } catch (error) {
+    console.error('Get statistics error:', error);
+    return res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Get all sericulturists
+app.get("/api/sericulturists", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim();
+    const status = (req.query.status || '').trim();
+    const { where, params } = buildSericulturistFilters(search, status);
 
     const [sericulturists, total] = await Promise.all([
-      db.all('SELECT * FROM sericulturists ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]),
-      db.get('SELECT COUNT(*) as count FROM sericulturists')
+      db.all(
+        `SELECT ${SERICULTURIST_COLUMNS} FROM sericulturists ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        [...params, limit, offset]
+      ),
+      db.get(`SELECT COUNT(*) as count FROM sericulturists ${where}`, params)
     ]);
+
+    const totalItems = total.count;
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
     return res.json({
       ok: true,
       sericulturists,
       pagination: {
-        page,
+        current: page,
+        total: totalPages,
         limit,
-        total: total.count,
-        totalPages: Math.ceil(total.count / limit)
+        totalItems
       }
     });
   } catch (error) {
@@ -350,51 +431,119 @@ app.get("/api/sericulturists", requireAuth, async (req, res) => {
   }
 });
 
-// Create sericulturist
-app.post("/api/sericulturists", requireAuth, async (req, res) => {
+// Bulk update status (must be registered before /:id)
+app.put("/api/sericulturists/bulk/status", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { name, email, phone, address, status = 'active' } = req.body;
-    
-    if (!name) {
-      return res.status(400).json({ error: 'Name is required' });
+    const { ids, status } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'IDs array is required' });
     }
 
+    if (!status || !['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status is required' });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
     const result = await db.run(
-      'INSERT INTO sericulturists (name, email, phone, address, status) VALUES (?, ?, ?, ?, ?)',
-      [name, email, phone, address, status]
+      `UPDATE sericulturists SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
+      [status, ...ids]
     );
 
     return res.json({
       ok: true,
-      sericulturist: {
-        id: result.lastID,
-        name,
-        email,
-        phone,
-        address,
-        status
-      }
+      updatedCount: result.changes,
+      message: `Updated ${result.changes} sericulturists`
     });
   } catch (error) {
+    console.error('Bulk update status error:', error);
+    return res.status(500).json({ error: 'Failed to bulk update status' });
+  }
+});
+
+// Bulk delete (must be registered before /:id)
+app.delete("/api/sericulturists/bulk", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'IDs array is required' });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const result = await db.run(
+      `DELETE FROM sericulturists WHERE id IN (${placeholders})`,
+      ids
+    );
+
+    return res.json({
+      ok: true,
+      deletedCount: result.changes,
+      message: `Deleted ${result.changes} sericulturists`
+    });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    return res.status(500).json({ error: 'Failed to bulk delete sericulturists' });
+  }
+});
+
+// Create sericulturist
+app.post("/api/sericulturists", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      address,
+      role,
+      ad_office,
+      status = 'active',
+      password
+    } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    let passwordHash = null;
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    const result = await db.run(
+      'INSERT INTO sericulturists (name, email, phone, address, role, ad_office, password_hash, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, email, phone || null, address || null, role || null, ad_office || null, passwordHash, status]
+    );
+
+    const sericulturist = await db.get(
+      `SELECT ${SERICULTURIST_COLUMNS} FROM sericulturists WHERE id = ?`,
+      [result.lastID]
+    );
+
+    return res.status(201).json({ ok: true, sericulturist });
+  } catch (error) {
     console.error('Create sericulturist error:', error);
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
     return res.status(500).json({ error: 'Failed to create sericulturist' });
   }
 });
 
 // Get sericulturist by ID
-app.get("/api/sericulturists/:id", requireAuth, async (req, res) => {
+app.get("/api/sericulturists/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const sericulturist = await db.get('SELECT * FROM sericulturists WHERE id = ?', [id]);
-    
+    const sericulturist = await db.get(
+      `SELECT ${SERICULTURIST_COLUMNS} FROM sericulturists WHERE id = ?`,
+      [id]
+    );
+
     if (!sericulturist) {
       return res.status(404).json({ error: 'Sericulturist not found' });
     }
 
-    return res.json({
-      ok: true,
-      sericulturist
-    });
+    return res.json({ ok: true, sericulturist });
   } catch (error) {
     console.error('Get sericulturist error:', error);
     return res.status(500).json({ error: 'Failed to fetch sericulturist' });
@@ -402,47 +551,69 @@ app.get("/api/sericulturists/:id", requireAuth, async (req, res) => {
 });
 
 // Update sericulturist
-app.put("/api/sericulturists/:id", requireAuth, async (req, res) => {
+app.put("/api/sericulturists/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, address, status } = req.body;
-    
-    if (!name) {
-      return res.status(400).json({ error: 'Name is required' });
+    const {
+      name,
+      email,
+      phone,
+      address,
+      role,
+      ad_office,
+      status,
+      password
+    } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
     }
 
-    const existingSericulturist = await db.get('SELECT id FROM sericulturists WHERE id = ?', [id]);
+    const existingSericulturist = await db.get('SELECT * FROM sericulturists WHERE id = ?', [id]);
     if (!existingSericulturist) {
       return res.status(404).json({ error: 'Sericulturist not found' });
     }
 
-    await db.run(
-      'UPDATE sericulturists SET name = ?, email = ?, phone = ?, address = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [name, email, phone, address, status, id]
-    );
+    let passwordHash = existingSericulturist.password_hash;
+    if (password && String(password).trim()) {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
 
-    return res.json({
-      ok: true,
-      sericulturist: {
-        id: parseInt(id),
+    await db.run(
+      'UPDATE sericulturists SET name = ?, email = ?, phone = ?, address = ?, role = ?, ad_office = ?, password_hash = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [
         name,
         email,
-        phone,
-        address,
-        status
-      }
-    });
+        phone || null,
+        address || null,
+        role || null,
+        ad_office || null,
+        passwordHash,
+        status ?? existingSericulturist.status,
+        id
+      ]
+    );
+
+    const sericulturist = await db.get(
+      `SELECT ${SERICULTURIST_COLUMNS} FROM sericulturists WHERE id = ?`,
+      [id]
+    );
+
+    return res.json({ ok: true, sericulturist });
   } catch (error) {
     console.error('Update sericulturist error:', error);
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
     return res.status(500).json({ error: 'Failed to update sericulturist' });
   }
 });
 
 // Delete sericulturist
-app.delete("/api/sericulturists/:id", requireAuth, async (req, res) => {
+app.delete("/api/sericulturists/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const existingSericulturist = await db.get('SELECT id FROM sericulturists WHERE id = ?', [id]);
     if (!existingSericulturist) {
       return res.status(404).json({ error: 'Sericulturist not found' });
@@ -457,84 +628,6 @@ app.delete("/api/sericulturists/:id", requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Delete sericulturist error:', error);
     return res.status(500).json({ error: 'Failed to delete sericulturist' });
-  }
-});
-
-// Bulk update status
-app.put("/api/sericulturists/bulk/status", requireAuth, async (req, res) => {
-  try {
-    const { ids, status } = req.body;
-    
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'IDs array is required' });
-    }
-
-    if (!status) {
-      return res.status(400).json({ error: 'Status is required' });
-    }
-
-    const placeholders = ids.map(() => '?').join(',');
-    await db.run(
-      `UPDATE sericulturists SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
-      [status, ...ids]
-    );
-
-    return res.json({
-      ok: true,
-      message: `${ids.length} sericulturists updated successfully`
-    });
-  } catch (error) {
-    console.error('Bulk update status error:', error);
-    return res.status(500).json({ error: 'Failed to bulk update status' });
-  }
-});
-
-// Bulk delete
-app.delete("/api/sericulturists/bulk", requireAuth, async (req, res) => {
-  try {
-    const { ids } = req.body;
-    
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'IDs array is required' });
-    }
-
-    const placeholders = ids.map(() => '?').join(',');
-    const result = await db.run(
-      `DELETE FROM sericulturists WHERE id IN (${placeholders})`,
-      [...ids]
-    );
-
-    return res.json({
-      ok: true,
-      message: `${result.changes} sericulturists deleted successfully`
-    });
-  } catch (error) {
-    console.error('Bulk delete error:', error);
-    return res.status(500).json({ error: 'Failed to bulk delete sericulturists' });
-  }
-});
-
-// Get statistics
-app.get("/api/sericulturists/statistics", requireAuth, async (req, res) => {
-  try {
-    const [total, active, inactive] = await Promise.all([
-      db.get('SELECT COUNT(*) as count FROM sericulturists'),
-      db.get('SELECT COUNT(*) as count FROM sericulturists WHERE status = "active"'),
-      db.get('SELECT COUNT(*) as count FROM sericulturists WHERE status = "inactive"')
-    ]);
-
-    return res.json({
-      ok: true,
-      statistics: {
-        totalSericulturists: total.count,
-        activeSericulturists: active.count,
-        inactiveSericulturists: inactive.count,
-        newThisMonth: 0 // TODO: Implement monthly calculation
-      }
-    });
-  } catch (error) {
-    console.error('Get statistics error:', error);
-    return res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
 

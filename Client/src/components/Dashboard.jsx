@@ -1,6 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Clock, Users, UserCheck, UserX, TrendingUp, Calendar, Activity, Building2, ChevronDown, FileText, Package, Cpu, Factory, BarChart3, Settings, Menu, X } from 'lucide-react';
+import {
+  LogOut,
+  Clock,
+  Users,
+  UserCheck,
+  UserX,
+  Calendar,
+  Activity,
+  Building2,
+  ChevronDown,
+  FileText,
+  Menu,
+  X,
+  UserPlus,
+  ShieldCheck,
+  Database,
+} from 'lucide-react';
+import cocoonLogo from '../assets/login-bg.png';
 import { authService } from '../services/auth.js';
 import { sericulturistService } from "../services/sericulturist.js";
 import UserList from "./UserList.jsx";
@@ -9,6 +26,9 @@ import PLSDashboard from "./PLSDashboard.jsx";
 import PRCDashboard from "./PRCDashboard.jsx";
 import POCDashboard from "./POCDashboard.jsx";
 import ReportsDashboard from "./ReportsDashboard.jsx";
+import StatCard from "./ui/StatCard.jsx";
+import ProfileDropdown from "./ui/ProfileDropdown.jsx";
+import LuxuryCard from "./ui/LuxuryCard.jsx";
 import "./Dashboard.css";
 
 const REPORT_TYPES = [
@@ -34,16 +54,14 @@ export default function Dashboard({ user, onLogout }) {
   const [showReportsDropdown, setShowReportsDropdown] = useState(false);
   const [selectedReport, setSelectedReport] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Local API URL only
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
         const FINAL_API = API_BASE;
-        
-        console.log('Dashboard fetching from:', FINAL_API);
         
         const [dashboardRes, statsRes] = await Promise.all([
           fetch(`${FINAL_API}/admin/dashboard`, {
@@ -56,7 +74,6 @@ export default function Dashboard({ user, onLogout }) {
         ]);
         
         const dashboard = await dashboardRes.json();
-        console.log('Dashboard data:', dashboard);
         
         if (dashboard.ok) {
           setDashboardData(dashboard);
@@ -66,7 +83,6 @@ export default function Dashboard({ user, onLogout }) {
         }
       } catch (err) {
         console.error('Dashboard fetch error:', err);
-        // Set default data if API fails
         setDashboardData({
           ok: true,
           message: 'Dashboard loaded with default data',
@@ -103,37 +119,21 @@ export default function Dashboard({ user, onLogout }) {
     setSelectedReport(reportType);
     setShowSectionDropdown(false);
     setShowReportsDropdown(false);
-    // Open in same tab for Section dropdown using React Router (NOT new tab)
     const reportUrl = `/${reportType.toLowerCase()}-dashboard`;
-    console.log('Navigating to:', reportUrl, 'in same tab using React Router');
     navigate(reportUrl);
   };
 
   const handleReportView = (reportType) => {
     setSelectedReport(reportType);
     setShowReportsDropdown(false);
-    // Open in same dashboard for Reports dropdown
     setActiveView(reportType.toLowerCase());
   };
 
-  const handleDownloadReport = (reportType) => {
-    console.log(`Downloading ${reportType} Report...`);
-    setShowReportsDropdown(false);
-    // Add actual download logic here
-  };
-
-  const StatCard = ({ icon, title, value, subtitle, color, trend }) => (
-    <div className={`stat-card ${color}`}>
-      <div className="stat-icon">
-        {icon}
-      </div>
-      <div className="stat-content">
-        <h3>{title}</h3>
-        <div className="stat-value">{value}</div>
-        {subtitle && <div className="stat-subtitle">{subtitle}</div>}
-        {trend && <div className="stat-trend">{trend}</div>}
-      </div>
-    </div>
+  const activePercentage = Math.round(
+    (statistics?.activeUsers || 0) / (statistics?.totalUsers || 1) * 100
+  );
+  const inactivePercentage = Math.round(
+    (statistics?.inactiveUsers || 0) / (statistics?.totalUsers || 1) * 100
   );
 
   if (loading) {
@@ -148,14 +148,29 @@ export default function Dashboard({ user, onLogout }) {
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
+        <div className="dashboard-header-accent" aria-hidden="true" />
+        <div className="dashboard-header-pattern" aria-hidden="true" />
+
         <div className="header-content">
           <div className="header-left">
-            <h1>PDL Admin Dashboard</h1>
-            <p>Welcome back, {user?.email}!</p>
+            <div className="brand-mark">
+              <div className="brand-cocoon-frame">
+                <img
+                  src={cocoonLogo}
+                  alt="Silk cocoon"
+                  className="brand-cocoon-img"
+                />
+              </div>
+            </div>
+            <div className="brand-divider" aria-hidden="true" />
+            <div className="brand-text">
+              <span className="brand-eyebrow">Silk Samagra · Sericulture</span>
+              <h1>PDL Admin Dashboard</h1>
+              <p>Enterprise Management System</p>
+            </div>
           </div>
           
           <div className="header-right">
-            {/* Mobile Menu Toggle */}
             <button 
               className="mobile-menu-toggle" 
               onClick={toggleMobileMenu}
@@ -164,19 +179,17 @@ export default function Dashboard({ user, onLogout }) {
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             
-            <div className="user-info">
-              <User size={20} />
-              <span>{user?.email}</span>
-            </div>
-            <button className="logout-btn" onClick={handleLogout}>
-              <LogOut size={20} />
-              Logout
-            </button>
+            <ProfileDropdown
+              user={user}
+              isOpen={showProfileDropdown}
+              onToggle={() => setShowProfileDropdown(!showProfileDropdown)}
+              onClose={() => setShowProfileDropdown(false)}
+              onLogout={handleLogout}
+            />
           </div>
         </div>
       </header>
 
-      {/* Mobile Navigation Overlay */}
       {mobileMenuOpen && (
         <div className="mobile-nav-overlay" onClick={toggleMobileMenu}>
           <div className="mobile-nav-menu" onClick={(e) => e.stopPropagation()}>
@@ -224,6 +237,12 @@ export default function Dashboard({ user, onLogout }) {
               >
                 <FileText size={20} />
                 <span>Reports</span>
+              </button>
+
+              <div className="mobile-nav-divider" />
+              <button className="mobile-nav-logout" onClick={handleLogout}>
+                <LogOut size={18} />
+                Sign Out
               </button>
             </div>
           </div>
@@ -303,7 +322,7 @@ export default function Dashboard({ user, onLogout }) {
                   setShowReportsDropdown(false);
                 }}
               >
-                📊 All Reports Dashboard
+                All Reports Dashboard
               </button>
               <div className="dropdown-divider"></div>
               {ALL_REPORT_TYPES.map(report => (
@@ -323,21 +342,38 @@ export default function Dashboard({ user, onLogout }) {
       <main className="dashboard-main">
         {activeView === 'overview' && (
           <div className="overview-view">
+            <div className="overview-header">
+              <div>
+                <h2 className="overview-title">Dashboard Overview</h2>
+                <p className="overview-subtitle">
+                  Welcome back, {user?.email}. Here&apos;s your enterprise snapshot.
+                </p>
+              </div>
+            </div>
+
             <div className="stats-grid">
               <StatCard
                 icon={<Users size={24} />}
                 title="Total Users"
                 value={statistics?.totalUsers || 0}
                 subtitle="Registered users"
-                color="blue"
+                trend={
+                  statistics?.recentGrowth != null || statistics?.newThisMonth != null
+                    ? `+${statistics?.recentGrowth ?? statistics?.newThisMonth}% this month`
+                    : 'All registered accounts'
+                }
+                trendUp
+                variant="emerald"
               />
               
               <StatCard
                 icon={<UserCheck size={24} />}
                 title="Active Users"
                 value={statistics?.activeUsers || 0}
-                subtitle={`${Math.round((statistics?.activeUsers || 0) / (statistics?.totalUsers || 1) * 100)}% of total`}
-                color="green"
+                subtitle={`${activePercentage}% of total`}
+                trend={`${activePercentage}% active`}
+                trendUp={activePercentage >= 50}
+                variant="gold"
               />
               
               <StatCard
@@ -345,76 +381,83 @@ export default function Dashboard({ user, onLogout }) {
                 title="Inactive Users"
                 value={statistics?.inactiveUsers || 0}
                 subtitle="Need attention"
-                color="orange"
+                trend={`${inactivePercentage}% inactive`}
+                trendUp={false}
+                variant="slate"
               />
-              
-              </div>
+            </div>
 
             <div className="dashboard-cards">
-              <div className="card">
-                <div className="card-header">
-                  <h3>
-                    <Clock size={18} />
-                    Server Information
-                  </h3>
+              <LuxuryCard
+                title="Server Information"
+                icon={<Clock size={18} />}
+              >
+                <div className="server-info-grid">
+                  <div className="server-info-item">
+                    <span className="server-info-label">Server Time</span>
+                    <span className="server-info-value">
+                      {new Date(dashboardData?.serverTime).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="server-info-item">
+                    <span className="server-info-label">Status</span>
+                    <span className="status-badge status-online">
+                      <span className="status-dot"></span>
+                      Online
+                    </span>
+                  </div>
+                  <div className="server-info-item">
+                    <span className="server-info-label">Database</span>
+                    <span className="db-badge">
+                      <Database size={14} />
+                      PostgreSQL
+                    </span>
+                  </div>
                 </div>
-                <div className="card-content">
-                  <div className="info-item">
-                    <label>Server Time:</label>
-                    <span>{new Date(dashboardData?.serverTime).toLocaleString()}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Status:</label>
-                    <span className="status-online">Online</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Database:</label>
-                    <span>PostgreSQL</span>
-                  </div>
-                </div>
-              </div>
+              </LuxuryCard>
 
-              <div className="card">
-                <div className="card-header">
-                  <h3>
-                    <Calendar size={18} />
-                    Recent Activity
-                  </h3>
-                </div>
-                <div className="card-content">
+              <LuxuryCard
+                title="Recent Activity"
+                icon={<Calendar size={18} />}
+              >
+                <div className="activity-timeline">
                   <div className="activity-item">
-                    <div className="activity-icon new-user"></div>
+                    <div className="activity-icon new-user">
+                      <UserPlus size={16} />
+                    </div>
                     <div className="activity-details">
                       <strong>New registrations</strong>
                       <span>{statistics?.recentGrowth || 0} users this month</span>
                     </div>
+                    <span className="activity-time">Today</span>
                   </div>
                   <div className="activity-item">
-                    <div className="activity-icon active-user"></div>
+                    <div className="activity-icon active-user">
+                      <UserCheck size={16} />
+                    </div>
                     <div className="activity-details">
                       <strong>Active users</strong>
-                      <span>{statistics?.activePercentage || 0}% engagement rate</span>
+                      <span>{statistics?.activePercentage || activePercentage}% engagement rate</span>
                     </div>
+                    <span className="activity-time">Live</span>
                   </div>
                   <div className="activity-item">
-                    <div className="activity-icon system"></div>
+                    <div className="activity-icon system">
+                      <ShieldCheck size={16} />
+                    </div>
                     <div className="activity-details">
                       <strong>System status</strong>
                       <span>All systems operational</span>
                     </div>
+                    <span className="activity-time activity-time-success">Healthy</span>
                   </div>
                 </div>
-              </div>
+              </LuxuryCard>
             </div>
 
-            <div className="card full-width">
-              <div className="card-header">
-                <h3>System Message</h3>
-              </div>
-              <div className="card-content">
-                <p>{dashboardData?.message}</p>
-              </div>
-            </div>
+            <LuxuryCard title="System Message" fullWidth>
+              <p className="system-message">{dashboardData?.message}</p>
+            </LuxuryCard>
           </div>
         )}
 

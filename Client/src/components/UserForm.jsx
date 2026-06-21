@@ -7,7 +7,7 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    password: user?.password || '',
+    password: '',
     phone: user?.phone || '',
     address: user?.address || '',
     role: user?.role || '',
@@ -33,13 +33,16 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
     setError('');
 
     try {
+      const payload = { ...formData };
+      if (mode === 'edit' && !payload.password) {
+        delete payload.password;
+      }
+
       let result;
       if (mode === 'create') {
-        result = await sericulturistService.create(formData);
+        result = await sericulturistService.create(payload);
       } else {
-        console.log('Updating user:', user.id, 'with data:', formData);
-        result = await sericulturistService.update(user.id, formData);
-        console.log('Update result:', result);
+        result = await sericulturistService.update(user.id, payload);
       }
 
       if (result.ok) {

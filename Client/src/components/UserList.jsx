@@ -25,16 +25,19 @@ export default function UserList() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      setError('');
       const result = await sericulturistService.getAll(
         pagination.current,
         pagination.limit,
         searchTerm,
         statusFilter
       );
-      
+
       if (result.ok) {
-        setUsers(result.sericulturists);
+        setUsers(result.sericulturists || []);
         setPagination(result.pagination);
+      } else {
+        setError(result.error || 'Failed to load users');
       }
     } catch (err) {
       setError(err.message);
@@ -46,6 +49,10 @@ export default function UserList() {
   useEffect(() => {
     fetchUsers();
   }, [pagination.current, pagination.limit, searchTerm, statusFilter]);
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, current: 1 }));
+  }, [searchTerm, statusFilter]);
 
   const handleCreateUser = () => {
     setEditingUser(null);

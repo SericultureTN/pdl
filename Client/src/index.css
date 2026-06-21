@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --pdl-primary: #0B5D3B;
+  --pdl-secondary: #113D2C;
+  --pdl-accent: #D4AF37;
+  --pdl-bg: #F8FAFC;
+  --pdl-glass: rgba(255, 255, 255, 0.92);
+  --pdl-glass-border: rgba(11, 93, 59, 0.1);
+  --pdl-radius: 24px;
+  --pdl-radius-lg: 28px;
+  --pdl-shadow: 0 4px 24px rgba(11, 93, 59, 0.08);
+  --pdl-shadow-hover: 0 20px 48px rgba(11, 93, 59, 0.12);
+  --pdl-text: #113D2C;
+  --pdl-text-muted: #64748B;
+  --pdl-online: #10B981;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--pdl-bg);
+    color: var(--pdl-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

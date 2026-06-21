@@ -2,6 +2,32 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 const FINAL_API = API_BASE;
 
+function normalizePagination(pagination = {}, page = 1, limit = 10) {
+  const totalItems = pagination.totalItems ?? pagination.total ?? 0;
+  const totalPages =
+    pagination.totalPages ??
+    (pagination.total && pagination.total !== totalItems ? pagination.total : Math.max(1, Math.ceil(totalItems / limit)));
+
+  return {
+    current: pagination.current ?? pagination.page ?? page,
+    total: totalPages,
+    limit: pagination.limit ?? limit,
+    totalItems
+  };
+}
+
+async function parseApiError(response, fallbackMessage) {
+  try {
+    const data = await response.json();
+    throw new Error(data.error || fallbackMessage);
+  } catch (error) {
+    if (error instanceof Error && error.message !== fallbackMessage) {
+      throw error;
+    }
+    throw new Error(fallbackMessage);
+  }
+}
+
 export const sericulturistService = {
   // Get all sericulturists with pagination and filtering
   async getAll(page = 1, limit = 10, search = '', status = '') {
@@ -12,33 +38,22 @@ export const sericulturistService = {
       ...(status && { status })
     });
 
-    try {
-      const response = await fetch(`${FINAL_API}/sericulturists?${params}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch sericulturists');
+    const response = await fetch(`${FINAL_API}/sericulturists?${params}`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
       }
+    });
 
-      return response.json();
-    } catch (error) {
-      console.error('Sericulturist service error:', error);
-      // Return default data if API fails
-      return {
-        ok: true,
-        sericulturists: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          totalPages: 0
-        }
-      };
+    if (!response.ok) {
+      await parseApiError(response, 'Failed to fetch sericulturists');
     }
+
+    const data = await response.json();
+    return {
+      ...data,
+      pagination: normalizePagination(data.pagination, page, limit)
+    };
   },
 
   // Get sericulturist by ID
@@ -183,31 +198,17 @@ export const sericulturistService = {
 
   // Get statistics
   async getStatistics() {
-    try {
-      const response = await fetch(`${FINAL_API}/sericulturists/statistics`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch statistics');
+    const response = await fetch(`${FINAL_API}/sericulturists/statistics`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
       }
+    });
 
-      return response.json();
-    } catch (error) {
-      console.error('Get statistics error:', error);
-      // Return default statistics if API fails
-      return {
-        ok: true,
-        statistics: {
-          totalSericulturists: 0,
-          activeSericulturists: 0,
-          inactiveSericulturists: 0,
-          newThisMonth: 0
-        }
-      };
+    if (!response.ok) {
+      await parseApiError(response, 'Failed to fetch statistics');
     }
+
+    return response.json();
   }
 };
