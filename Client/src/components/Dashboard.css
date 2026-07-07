@@ -410,6 +410,11 @@
   max-width: 1440px;
   margin: 0 auto;
   padding: 2.5rem 2rem 3rem;
+  min-width: 0;
+}
+
+.users-view {
+  min-width: 0;
 }
 
 .overview-header {

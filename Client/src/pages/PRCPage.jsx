@@ -1,19 +1,20 @@
-import { useState, useEffect } from "react";
-import { Cpu, Home, Users, Settings, BarChart3, ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { Cpu, Home, Users, Settings, BarChart3, ArrowLeft, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./prcpage.css";
 
 export default function PRCPage() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleBackToMain = () => {
-    console.log('Navigating back to main dashboard in same tab');
     navigate('/');
   };
 
   const handleSidebarClick = (view) => {
     setActiveView(view);
+    setSidebarOpen(false);
   };
 
   const renderContent = () => {
@@ -58,8 +59,16 @@ export default function PRCPage() {
 
   return (
     <div className="prc-page-container">
-      {/* Sidebar */}
-      <div className="prc-sidebar">
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="prc-sidebar-overlay"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div className={`prc-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="prc-sidebar-header">
           <h2>
             <Cpu size={24} />
@@ -116,12 +125,21 @@ export default function PRCPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="prc-main-content">
         <div className="prc-page-header">
           <div className="prc-page-header-left">
-            <h1>PRC</h1>
-            <p>Pre Cocoon</p>
+            <button
+              type="button"
+              className="prc-menu-toggle"
+              aria-label="Open menu"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <div>
+              <h1>PRC</h1>
+              <p>Pre Cocoon</p>
+            </div>
           </div>
           <button onClick={handleBackToMain} className="prc-back-btn">
             <ArrowLeft size={16} />

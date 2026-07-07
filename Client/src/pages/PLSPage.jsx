@@ -1,19 +1,20 @@
-import { useState, useEffect } from "react";
-import { Package, Home, Users, Settings, BarChart3, ArrowLeft, FileText, Menu, X } from "lucide-react";
+import { useState } from "react";
+import { Package, Home, Users, Settings, BarChart3, ArrowLeft, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./plspage.css";
 
 export default function PLSPage() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleBackToMain = () => {
-    console.log('Navigating back to main dashboard in same tab');
     navigate('/');
   };
 
   const handleSidebarClick = (view) => {
     setActiveView(view);
+    setSidebarOpen(false);
   };
 
   const renderContent = () => {
@@ -58,8 +59,16 @@ export default function PLSPage() {
 
   return (
     <div className="pls-page-container">
-      {/* Sidebar */}
-      <div className="pls-sidebar">
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="pls-sidebar-overlay"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div className={`pls-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="pls-sidebar-header">
           <h2>
             <Package size={24} />
@@ -116,12 +125,18 @@ export default function PLSPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="pls-main-content">
         <div className="pls-page-header">
           <div className="pls-page-header-left">
+            <button
+              type="button"
+              className="pls-menu-toggle"
+              aria-label="Open menu"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
             <h1>PLS<p>-</p><p>Plans & Schemes</p></h1>
-            
           </div>
           <button onClick={handleBackToMain} className="pls-back-btn">
             <ArrowLeft size={16} />

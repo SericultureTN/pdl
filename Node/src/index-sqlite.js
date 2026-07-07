@@ -9,6 +9,8 @@ import jwt from "jsonwebtoken";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 import databaseViewerRouter from "./database-viewer.js";
+import { initMisSqlite } from "./mis/init-sqlite.js";
+import { createMisRouter, seedMisUsers } from "./mis/routes.js";
 
 const app = express();
 
@@ -140,6 +142,9 @@ async function initializeDatabase() {
       console.log('✅ Sample sericulturist created');
     }
 
+    await initMisSqlite(db);
+    await seedMisUsers(db);
+
     console.log('✅ SQLite database initialized successfully');
     return true;
   } catch (error) {
@@ -242,6 +247,9 @@ app.get("/health", async (_req, res) => {
 // Database viewer (no auth required for local development)
 app.use("/api/database", databaseViewerRouter);
 
+// MIS Report Viewer API
+app.use("/api", createMisRouter(() => db));
+
 // Login endpoint
 app.post("/api/login", async (req, res) => {
   try {
@@ -259,6 +267,15 @@ app.post("/api/login", async (req, res) => {
     if (admin && await bcrypt.compare(password, admin.password_hash)) {
       user = admin;
       userType = 'admin';
+    }
+
+    // Try MIS user login
+    if (!user) {
+      const misUser = await db.get('SELECT * FROM mis_users WHERE email = ?', [email]);
+      if (misUser && await bcrypt.compare(password, misUser.password_hash)) {
+        user = { ...misUser, type: 'mis', role: misUser.role };
+        userType = 'mis';
+      }
     }
 
     // If not admin, try user login
@@ -279,7 +296,8 @@ app.post("/api/login", async (req, res) => {
         id: user.id, 
         email: user.email, 
         type: userType,
-        role: user.role || null
+        role: user.role || null,
+        misRole: userType === 'mis' ? user.role : userType === 'admin' ? 'admin' : null,
       },
       process.env.JWT_SECRET || 'local_dev_secret_change_me_in_production',
       { expiresIn: '24h' }
@@ -297,7 +315,7 @@ app.post("/api/login", async (req, res) => {
       type: userType
     };
 
-    if (userType === 'user') {
+    if (userType === 'user' || userType === 'mis') {
       responseUser.name = user.name;
       responseUser.role = user.role;
     }

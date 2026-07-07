@@ -5,11 +5,14 @@
   "type": "module",
   "main": "src/api/index.js",
   "scripts": {
-    "dev": "node --watch src/index-simple.js",
-    "dev-postgres": "node --watch src/index-postgres.js",
+    "dev": "node --watch src/index-sqlite.js",
+    "dev-postgres": "node scripts/check-postgres-env.js && node --watch src/index-postgres.js",
     "dev-sqlite": "node --watch src/index-sqlite.js",
-    "start": "node src/index-simple.js",
-    "start-postgres": "node src/index-postgres.js",
+    "setup:env": "node scripts/setup-env.js",
+    "setup:postgres": "node scripts/check-postgres-env.js && node scripts/init-postgres-db.js",
+    "check:postgres": "node scripts/check-postgres-env.js",
+    "start": "node src/index-sqlite.js",
+    "start-postgres": "node scripts/check-postgres-env.js && node src/index-postgres.js",
     "start-sqlite": "node src/index-sqlite.js",
     "build": "echo 'Build completed'"
   },
@@ -26,6 +29,7 @@
     "node-fetch": "^3.3.2",
     "pg": "^8.17.2",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "xlsx": "^0.18.5"
   }
 }

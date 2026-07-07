@@ -5,10 +5,10 @@ export default function PlantationPageShell({
   scheme,
   idPrefix,
   unitLabel = 'Unit: Acres & Farmers',
-  persistOptions,
+  onFiltersChange,
   children,
 }) {
-  const filters = usePlantationOfficePeriodFilters(scheme, persistOptions);
+  const filters = usePlantationOfficePeriodFilters(scheme, { onFiltersChange });
 
   return (
     <div className="dfls-distribution-view plantation-scheme-view plantation-scheme-friendly">

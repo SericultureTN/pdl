@@ -14,6 +14,13 @@ export const INITIAL_ULM = {
   p1: { value: 50 },
 };
 
+/** Zeroed ULM used before API data arrives (avoids flashing demo numbers). */
+export const EMPTY_ULM = {
+  bv: { Govt: 0, NSSO: 0, 'TN Pvt': 0, 'Other State': 0 },
+  cb: { 'Other State': 0, NSSO: 0 },
+  p1: { value: 0 },
+};
+
 export const INITIAL_DM = {
   bv: { Govt: '', NSSO: '', 'TN Pvt': '', 'Other State': '' },
   cb: { 'Other State': '', NSSO: '' },
@@ -22,6 +29,14 @@ export const INITIAL_DM = {
 
 export function createInitialDmData() {
   return JSON.parse(JSON.stringify(INITIAL_DM));
+}
+
+export function createInitialUlmData() {
+  return JSON.parse(JSON.stringify(INITIAL_ULM));
+}
+
+export function createEmptyUlmData() {
+  return JSON.parse(JSON.stringify(EMPTY_ULM));
 }
 
 export function normalizeDflsFilterDraft(draft) {

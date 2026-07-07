@@ -25,7 +25,6 @@ import MISDashboard from "./MISDashboard.jsx";
 import PLSDashboard from "./PLSDashboard.jsx";
 import PRCDashboard from "./PRCDashboard.jsx";
 import POCDashboard from "./POCDashboard.jsx";
-import ReportsDashboard from "./ReportsDashboard.jsx";
 import StatCard from "./ui/StatCard.jsx";
 import ProfileDropdown from "./ui/ProfileDropdown.jsx";
 import LuxuryCard from "./ui/LuxuryCard.jsx";
@@ -38,21 +37,12 @@ const REPORT_TYPES = [
   "POC"
 ];
 
-const ALL_REPORT_TYPES = [
-  "MIS",
-  "PLS", 
-  "PRC",
-  "POC"
-];
-
 export default function Dashboard({ user, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState('overview');
   const [showSectionDropdown, setShowSectionDropdown] = useState(false);
-  const [showReportsDropdown, setShowReportsDropdown] = useState(false);
-  const [selectedReport, setSelectedReport] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const navigate = useNavigate();
@@ -60,17 +50,16 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-        const FINAL_API = API_BASE;
-        
+        const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
         const [dashboardRes, statsRes] = await Promise.all([
-          fetch(`${FINAL_API}/admin/dashboard`, {
-            credentials: "include",
+          fetch(`${API_BASE}/admin/dashboard`, {
+            credentials: 'include',
             headers: {
-              'Content-Type': 'application/json'
-            }
+              'Content-Type': 'application/json',
+            },
           }),
-          sericulturistService.getStatistics()
+          sericulturistService.getStatistics(),
         ]);
         
         const dashboard = await dashboardRes.json();
@@ -116,17 +105,14 @@ export default function Dashboard({ user, onLogout }) {
   };
 
   const handleReportSelect = (reportType) => {
-    setSelectedReport(reportType);
     setShowSectionDropdown(false);
-    setShowReportsDropdown(false);
     const reportUrl = `/${reportType.toLowerCase()}-dashboard`;
     navigate(reportUrl);
   };
 
-  const handleReportView = (reportType) => {
-    setSelectedReport(reportType);
-    setShowReportsDropdown(false);
-    setActiveView(reportType.toLowerCase());
+  const handleOpenReports = () => {
+    sessionStorage.setItem('pdl-reports-back', 'dashboard');
+    navigate('/reports', { state: { from: 'dashboard' } });
   };
 
   const activePercentage = Math.round(
@@ -232,8 +218,11 @@ export default function Dashboard({ user, onLogout }) {
               </div>
               
               <button
-                className={`mobile-nav-item ${activeView === 'reports-dashboard' ? 'active' : ''}`}
-                onClick={() => handleMobileNavClick('reports-dashboard')}
+                className="mobile-nav-item"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleOpenReports();
+                }}
               >
                 <FileText size={20} />
                 <span>Reports</span>
@@ -298,45 +287,14 @@ export default function Dashboard({ user, onLogout }) {
           )}
         </div>
 
-        <div 
-          className="nav-dropdown-wrapper"
-          onMouseEnter={() => setShowReportsDropdown(true)}
-          onMouseLeave={() => setShowReportsDropdown(false)}
+        <button
+          type="button"
+          className="nav-btn"
+          onClick={handleOpenReports}
         >
-          <button className={`nav-btn ${activeView === 'reports-dashboard' ? 'active' : ''}`}>
-            <FileText size={16} />
-            Reports
-            <ChevronDown size={14} className="dropdown-arrow" />
-          </button>
-          
-          {showReportsDropdown && (
-            <div className="nav-dropdown">
-              <div className="dropdown-header">
-                <FileText size={16} />
-                <span>Report Options</span>
-              </div>
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  setActiveView('reports-dashboard');
-                  setShowReportsDropdown(false);
-                }}
-              >
-                All Reports Dashboard
-              </button>
-              <div className="dropdown-divider"></div>
-              {ALL_REPORT_TYPES.map(report => (
-                <button
-                  key={report}
-                  className="dropdown-item"
-                  onClick={() => handleReportView(report)}
-                >
-                  {report} Dashboard
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          <FileText size={16} />
+          Reports
+        </button>
       </nav>
 
       <main className="dashboard-main">
@@ -481,10 +439,6 @@ export default function Dashboard({ user, onLogout }) {
 
         {activeView === 'poc' && (
           <POCDashboard user={user} />
-        )}
-
-        {activeView === 'reports-dashboard' && (
-          <ReportsDashboard user={user} />
         )}
       </main>
     </div>

@@ -20,11 +20,20 @@ A comprehensive admin dashboard for managing sericulturists and PDL (Post-Develo
    ```bash
    cd Node
    npm install
-   npm run dev-sqlite
+   npm run dev          # SQLite — works immediately, no config needed
    ```
    - Backend runs on `http://localhost:4000`
-   - Uses SQLite database for local development
+   - Uses SQLite (`Node/database.sqlite`) — auto-created on first run
    - Default admin: `admin@example.com` / `Admin123!`
+
+   **Optional — PostgreSQL instead of SQLite:**
+   ```bash
+   cd Node
+   npm run setup:env    # creates .env from template
+   # Edit Node/.env — set DATABASE_URL with your PostgreSQL password
+   createdb pdl         # create database (once)
+   npm run dev-postgres
+   ```
 
 3. **Frontend Setup**
    ```bash
@@ -80,15 +89,23 @@ pdl/
 
 ## 🗄️ Database
 
-### Local Development (SQLite)
+### Local Development (SQLite) — recommended
+- Command: `npm run dev` or `npm run dev-sqlite`
 - Database file: `Node/database.sqlite`
-- Auto-initialization on first run
-- Sample data included
+- No `.env` file required
+- MIS report tables seeded automatically
+
+### Local Development (PostgreSQL)
+1. Install PostgreSQL and create a database: `createdb pdl`
+2. Run `npm run setup:env` in the `Node/` folder
+3. Edit `Node/.env` and set `DATABASE_URL` (replace `YOUR_PASSWORD`)
+4. Run `npm run dev-postgres`
+5. If env vars are missing, the server prints setup steps and exits — it will **not** start without a valid connection
 
 ### Production (PostgreSQL)
 - Supabase integration ready
-- Environment variables configuration
-- Connection pooling
+- Set `DATABASE_URL` in environment variables
+- Connection pooling enabled
 
 ## 🚀 Deployment
 

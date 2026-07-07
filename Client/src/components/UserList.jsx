@@ -156,7 +156,7 @@ export default function UserList() {
   return (
     <div className="user-list-container">
       <div className="user-list-header">
-        <div className="header-left">
+        <div className="user-list-header-left">
           <h2>
             <Users size={24} />
             Sericulturists

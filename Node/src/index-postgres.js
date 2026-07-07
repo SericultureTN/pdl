@@ -1,4 +1,13 @@
-import "dotenv/config";
+import { existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const envPath = resolve(__dirname, '../.env');
+if (existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -9,6 +18,9 @@ import jwt from "jsonwebtoken";
 import { testConnection, initializeDatabase, closePool, query } from './postgres.js';
 import { sericulturistServices } from './sericulturist-services.js';
 import { authServices } from './auth-postgres.js';
+import { createMisRouter, seedMisUsers } from './mis/routes.js';
+import { initMisPostgres } from './mis/init-postgres.js';
+import { createPgAdapter } from './mis/pg-adapter.js';
 
 const app = express();
 
@@ -23,10 +35,18 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
-      const allowedOrigins = CORS_ORIGIN.split(',');
+
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+
+      // Allow LAN access (e.g. http://192.168.1.5:5173) during local development
+      if (/^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(origin)) {
+        return callback(null, true);
+      }
+
+      const allowedOrigins = CORS_ORIGIN.split(',').map((o) => o.trim());
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -41,8 +61,9 @@ app.use(
 app.get("/health", async (_req, res) => {
   const dbConnected = await testConnection();
   return res.json({ 
-    ok: true, 
+    ok: dbConnected, 
     database: dbConnected ? 'connected' : 'disconnected',
+    type: 'PostgreSQL',
     timestamp: new Date().toISOString()
   });
 });
@@ -64,7 +85,7 @@ app.post("/api/test-login", async (req, res) => {
           ad_office: sericulturistResult.sericulturist.ad_office,
           name: sericulturistResult.sericulturist.name
         },
-        process.env.JWT_SECRET || "dev_secret_change_me",
+        process.env.JWT_SECRET || 'local_dev_secret_change_me_in_production',
         { expiresIn: "24h" }
       );
 
@@ -122,8 +143,8 @@ app.post("/api/login", async (req, res) => {
       }
 
       const token = jwt.sign(
-        { id: admin.id, email: admin.email, role: 'admin', name: 'Administrator' },
-        process.env.JWT_SECRET || "dev_secret_change_me",
+        { id: admin.id, email: admin.email, role: 'admin', type: 'admin', misRole: 'admin', name: 'Administrator' },
+        process.env.JWT_SECRET || 'local_dev_secret_change_me_in_production',
         { expiresIn: "24h" }
       );
 
@@ -136,6 +157,7 @@ app.post("/api/login", async (req, res) => {
 
       return res.json({
         ok: true,
+        token,
         user: {
           id: admin.id,
           email: admin.email,
@@ -145,7 +167,38 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
-    console.log('Admin not found, trying sericulturist login');
+    console.log('Admin not found, trying MIS user login');
+
+    const misResult = await query('SELECT * FROM mis_users WHERE email = $1', [email.trim().toLowerCase()]);
+    if (misResult.rows.length > 0) {
+      const misUser = misResult.rows[0];
+      const passwordMatch = await bcrypt.compare(password, misUser.password_hash);
+      if (passwordMatch) {
+        const token = jwt.sign(
+          { id: misUser.id, email: misUser.email, role: misUser.role, type: 'mis', misRole: misUser.role },
+          process.env.JWT_SECRET || 'local_dev_secret_change_me_in_production',
+          { expiresIn: "24h" }
+        );
+        res.cookie("token", token, {
+          httpOnly: true,
+          secure: false,
+          sameSite: "lax",
+          maxAge: 24 * 60 * 60 * 1000,
+        });
+        return res.json({
+          ok: true,
+          token,
+          user: {
+            id: misUser.id,
+            email: misUser.email,
+            name: misUser.name,
+            role: misUser.role,
+          },
+        });
+      }
+    }
+
+    console.log('MIS user not found, trying sericulturist login');
 
     // Try sericulturist login
     try {
@@ -160,7 +213,7 @@ app.post("/api/login", async (req, res) => {
             ad_office: sericulturistResult.sericulturist.ad_office,
             name: sericulturistResult.sericulturist.name
           },
-          process.env.JWT_SECRET || "dev_secret_change_me",
+          process.env.JWT_SECRET || 'local_dev_secret_change_me_in_production',
           { expiresIn: "24h" }
         );
 
@@ -235,7 +288,7 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: "No token provided" });
     }
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET || "dev_secret_change_me");
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'local_dev_secret_change_me_in_production');
     
     // Add user info to request
     req.user = payload;
@@ -567,16 +620,7 @@ app.get("/api/admin/admins", requireAdmin, async (req, res) => {
   }
 });
 
-// Error handling middleware
-app.use((err, _req, res, _next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: "Internal server error" });
-});
-
-// 404 handler
-app.use((_req, res) => {
-  res.status(404).json({ error: "Not found" });
-});
+// Error handling middleware — registered in startServer after MIS routes
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
@@ -596,23 +640,58 @@ const startServer = async () => {
   try {
     console.log('🔄 Starting server...');
     
-    // Test database connection
     const dbConnected = await testConnection();
     if (!dbConnected) {
-      console.error('❌ Failed to connect to database. Please check your PostgreSQL configuration.');
-      return;
+      console.error('❌ Failed to connect to database. Server not started.');
+      process.exit(1);
     }
 
-    // Initialize database schema
     const schemaInitialized = await initializeDatabase();
     if (!schemaInitialized) {
       console.error('❌ Failed to initialize database schema.');
+      process.exit(1);
+    }
+
+    const adminCheck = await query('SELECT id FROM admins WHERE email = $1', ['admin@example.com']);
+    if (adminCheck.rows.length === 0) {
+      const passwordHash = await bcrypt.hash('Admin123!', 10);
+      await query('INSERT INTO admins (email, password_hash) VALUES ($1, $2)', [
+        'admin@example.com',
+        passwordHash,
+      ]);
+      console.log('✅ Default admin created: admin@example.com / Admin123!');
+    }
+
+    const misDb = createPgAdapter(query);
+    await initMisPostgres(misDb);
+    await seedMisUsers(misDb);
+
+    app.use('/api', createMisRouter(() => misDb));
+
+    app.use((err, _req, res, _next) => {
+      console.error('Unhandled error:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    });
+
+    app.use((_req, res) => {
+      res.status(404).json({ error: 'Not found' });
+    });
+
+    if (process.env.VERCEL) {
+      console.log('✅ Server ready for serverless deployment');
       return;
     }
-    
-    console.log('✅ Server ready for serverless deployment');
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔑 Login: http://localhost:${PORT}/api/login`);
+      console.log(`📋 MIS viewer API: http://localhost:${PORT}/api/report`);
+      console.log(`🌐 LAN: use your PC IP, e.g. http://<your-ip>:${PORT}/health`);
+    });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
 };
 

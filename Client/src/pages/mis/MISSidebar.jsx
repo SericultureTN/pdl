@@ -13,15 +13,13 @@ import {
 import {
   MIS_DATA_ENTRY_ITEMS,
   MIS_MAIN_NAV_ITEMS,
-  MIS_REPORT_ITEMS,
-  MIS_REPORTS_DASHBOARD,
   misFullPath,
   isMisNavActive,
 } from './misNavConfig.js';
 import { authService } from '../../services/auth.js';
 import cocoonArt from '../../assets/login-bg.png';
 
-export default function MISSidebar({ onLogout }) {
+export default function MISSidebar({ open = false, onLogout, onNavigate }) {
   const location = useLocation();
 
   const dashboardItem = MIS_MAIN_NAV_ITEMS.find((item) => item.path === 'dashboard');
@@ -43,6 +41,7 @@ export default function MISSidebar({ onLogout }) {
       key={item.path}
       to={misFullPath(item.path)}
       className={`mis-portal-nav-item ${isMisNavActive(location.pathname, item.path) ? 'active' : ''}`}
+      onClick={onNavigate}
     >
       {icon}
       {item.label}
@@ -50,7 +49,7 @@ export default function MISSidebar({ onLogout }) {
   );
 
   return (
-    <aside className="mis-portal-sidebar">
+    <aside className={`mis-portal-sidebar ${open ? 'open' : ''}`}>
       <div className="mis-portal-logo">
         <div className="mis-portal-logo-icon">
           <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -83,6 +82,7 @@ export default function MISSidebar({ onLogout }) {
                   key={item.path}
                   to={misFullPath(item.path)}
                   className={`mis-portal-nav-sub-item ${active ? 'active' : ''}`}
+                  onClick={onNavigate}
                 >
                   {active ? <ChevronRight size={14} /> : <span className="mis-portal-nav-dot" />}
                   {item.label}
@@ -92,38 +92,24 @@ export default function MISSidebar({ onLogout }) {
           </div>
         </div>
 
-        <div className="mis-portal-nav-group">
-          <div className="mis-portal-nav-item mis-portal-nav-parent">
-            <BarChart3 size={18} />
-            Reports
-            <ChevronDown size={16} className="mis-portal-nav-chevron" />
-          </div>
-          <div className="mis-portal-nav-sub">
-            <Link
-              to={misFullPath(MIS_REPORTS_DASHBOARD.path)}
-              className={`mis-portal-nav-sub-item ${location.pathname === misFullPath(MIS_REPORTS_DASHBOARD.path) ? 'active' : ''}`}
-            >
-              {location.pathname === misFullPath(MIS_REPORTS_DASHBOARD.path)
-                ? <ChevronRight size={14} />
-                : <span className="mis-portal-nav-dot" />}
-              Reports Dashboard
-            </Link>
-            {MIS_REPORT_ITEMS.map((item) => {
-              const active = isMisNavActive(location.pathname, item.path);
+        <Link
+          to="/mis-viewer"
+          className={`mis-portal-nav-item ${location.pathname === '/mis-viewer' ? 'active' : ''}`}
+          onClick={onNavigate}
+        >
+          <BarChart3 size={18} />
+          MIS Report Viewer
+        </Link>
 
-              return (
-                <Link
-                  key={item.path}
-                  to={misFullPath(item.path)}
-                  className={`mis-portal-nav-sub-item ${active ? 'active' : ''}`}
-                >
-                  {active ? <ChevronRight size={14} /> : <span className="mis-portal-nav-dot" />}
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+        <Link
+          to="/reports"
+          state={{ from: 'mis' }}
+          className={`mis-portal-nav-item ${location.pathname === '/reports' ? 'active' : ''}`}
+          onClick={onNavigate}
+        >
+          <BarChart3 size={18} />
+          Reports Archive
+        </Link>
 
         {navLink(analyticsItem, <LineChart size={18} />)}
         {navLink(userManagementItem, <Users size={18} />)}

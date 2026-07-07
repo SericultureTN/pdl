@@ -1,5 +1,5 @@
 // Local API URL only
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const FINAL_API = API_BASE;
 
 function normalizePagination(pagination = {}, page = 1, limit = 10) {

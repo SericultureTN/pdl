@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   resolveAdOfficeForFilter,
   getAdOfficesForFilter,
@@ -7,15 +7,47 @@ import {
   getDefaultAdOffice,
 } from './plantationConstants.js';
 import { normalizeDflsFilterDraft } from './dflsConstants.js';
-import { loadDflsDraft, saveDflsDraft } from './dflsStorage.js';
 
-export function useOfficePeriodFilters(pageKey, { dmData, setDmData, createInitialDmData } = {}) {
+const FILTER_STORAGE_PREFIX = 'pdl-mis-filters-dfls-';
+
+function loadFilterPrefs(pageKey) {
+  try {
+    const raw = localStorage.getItem(`${FILTER_STORAGE_PREFIX}${pageKey}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveFilterPrefs(pageKey, data) {
+  try {
+    localStorage.setItem(`${FILTER_STORAGE_PREFIX}${pageKey}`, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+function buildFilterPayload(state) {
+  return {
+    subordinateOffice: state.subordinateOffice,
+    region: state.region,
+    adOffice: state.adOffice,
+    financialYear: state.financialYear,
+    month: state.month,
+  };
+}
+
+export function useOfficePeriodFilters(pageKey, { onFiltersChange } = {}) {
+  const onFiltersChangeRef = useRef(onFiltersChange);
+  onFiltersChangeRef.current = onFiltersChange;
+  const lastEmittedKeyRef = useRef('');
+
   const [subordinateOffice, setSubordinateOffice] = useState('Extension');
   const [region, setRegion] = useState('Erode Region');
   const [adOffice, setAdOffice] = useState('AD Salem');
-  const [financialYear, setFinancialYear] = useState('2024–25');
-  const [month, setMonth] = useState('May');
-  const [storageReady, setStorageReady] = useState(false);
+  const [financialYear, setFinancialYear] = useState('2025–26');
+  const [month, setMonth] = useState('July');
+  const [ready, setReady] = useState(false);
 
   const showRegionFields = usesRegionFilter(subordinateOffice);
   const showAdOfficeFields = showsAdOfficeFilter(subordinateOffice);
@@ -26,50 +58,52 @@ export function useOfficePeriodFilters(pageKey, { dmData, setDmData, createIniti
   );
 
   useEffect(() => {
-    if (!showAdOfficeFields || adOfficeOptions.length === 0) return;
-    if (!adOfficeOptions.includes(adOffice)) {
-      setAdOffice(adOfficeOptions[0]);
-    }
-  }, [showAdOfficeFields, adOfficeOptions, adOffice]);
-
-  useEffect(() => {
-    setStorageReady(false);
-    const saved = loadDflsDraft(pageKey);
+    lastEmittedKeyRef.current = '';
+    const saved = loadFilterPrefs(pageKey);
     const data = normalizeDflsFilterDraft(saved);
+
+    const offices = getAdOfficesForFilter(data.subordinateOffice, data.region);
+    const resolvedAdOffice = offices.includes(data.adOffice) ? data.adOffice : (offices[0] || data.adOffice);
 
     setSubordinateOffice(data.subordinateOffice);
     setRegion(data.region);
-    setAdOffice(data.adOffice);
-    setFinancialYear(data.financialYear);
-    setMonth(data.month);
-    if (setDmData && createInitialDmData) {
-      setDmData(saved?.dmData || createInitialDmData());
-    }
-    setStorageReady(true);
-  }, [pageKey, setDmData, createInitialDmData]);
+    setAdOffice(resolvedAdOffice);
+    setFinancialYear(data.financialYear?.includes('2025') ? data.financialYear : '2025–26');
+    setMonth(data.month === 'May' ? 'July' : data.month);
+    setReady(true);
+  }, [pageKey]);
 
   useEffect(() => {
-    if (!storageReady) return;
-    const payload = {
+    if (!ready) return;
+
+    if (showAdOfficeFields && adOfficeOptions.length > 0 && !adOfficeOptions.includes(adOffice)) {
+      setAdOffice(adOfficeOptions[0]);
+      return;
+    }
+
+    const payload = buildFilterPayload({
       subordinateOffice,
       region,
       adOffice,
       financialYear,
       month,
-    };
-    if (dmData !== undefined) {
-      payload.dmData = dmData;
-    }
-    saveDflsDraft(pageKey, payload);
+    });
+    const payloadKey = JSON.stringify(payload);
+    if (payloadKey === lastEmittedKeyRef.current) return;
+
+    lastEmittedKeyRef.current = payloadKey;
+    saveFilterPrefs(pageKey, payload);
+    onFiltersChangeRef.current?.(payload);
   }, [
-    storageReady,
+    ready,
     pageKey,
     subordinateOffice,
     region,
     adOffice,
     financialYear,
     month,
-    dmData,
+    showAdOfficeFields,
+    adOfficeOptions,
   ]);
 
   const handleSubordinateOfficeChange = (nextOffice) => {

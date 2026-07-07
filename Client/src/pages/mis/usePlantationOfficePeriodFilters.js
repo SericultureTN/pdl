@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   resolveAdOfficeForFilter,
   getAdOfficesForFilter,
@@ -8,21 +8,47 @@ import {
   getFinancialYearsForScheme,
   normalizeFilterDraft,
 } from './plantationConstants.js';
-import {
-  loadPlantationDraft,
-  savePlantationDraft,
-} from './plantationStorage.js';
 
-export function usePlantationOfficePeriodFilters(
-  scheme,
-  { dmData, setDmData, createInitialDmData, submitted, setSubmitted, onFilterChange } = {}
-) {
+const FILTER_STORAGE_PREFIX = 'pdl-mis-filters-plantation-';
+
+function loadFilterPrefs(schemeId) {
+  try {
+    const raw = localStorage.getItem(`${FILTER_STORAGE_PREFIX}${schemeId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveFilterPrefs(schemeId, data) {
+  try {
+    localStorage.setItem(`${FILTER_STORAGE_PREFIX}${schemeId}`, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+function buildFilterPayload(state) {
+  return {
+    subordinateOffice: state.subordinateOffice,
+    region: state.region,
+    adOffice: state.adOffice,
+    financialYear: state.financialYear,
+    month: state.month,
+  };
+}
+
+export function usePlantationOfficePeriodFilters(scheme, { onFiltersChange } = {}) {
+  const onFiltersChangeRef = useRef(onFiltersChange);
+  onFiltersChangeRef.current = onFiltersChange;
+  const lastEmittedKeyRef = useRef('');
+
   const [subordinateOffice, setSubordinateOffice] = useState('Extension');
   const [region, setRegion] = useState('Erode Region');
   const [adOffice, setAdOffice] = useState('AD Salem');
   const [financialYear, setFinancialYear] = useState(scheme.defaultFinancialYear);
-  const [month, setMonth] = useState('May');
-  const [storageReady, setStorageReady] = useState(false);
+  const [month, setMonth] = useState('July');
+  const [ready, setReady] = useState(false);
 
   const showRegionFields = usesRegionFilter(subordinateOffice);
   const showAdOfficeFields = showsAdOfficeFilter(subordinateOffice);
@@ -37,62 +63,55 @@ export function usePlantationOfficePeriodFilters(
   );
 
   useEffect(() => {
-    if (!showAdOfficeFields || adOfficeOptions.length === 0) return;
-    if (!adOfficeOptions.includes(adOffice)) {
-      setAdOffice(adOfficeOptions[0]);
-    }
-  }, [showAdOfficeFields, adOfficeOptions, adOffice]);
-
-  useEffect(() => {
-    setStorageReady(false);
-    const saved = loadPlantationDraft(scheme.id);
+    lastEmittedKeyRef.current = '';
+    const saved = loadFilterPrefs(scheme.id);
     const data = normalizeFilterDraft(saved, scheme);
+
+    const offices = getAdOfficesForFilter(data.subordinateOffice, data.region);
+    const resolvedAdOffice = offices.includes(data.adOffice) ? data.adOffice : (offices[0] || data.adOffice);
 
     setSubordinateOffice(data.subordinateOffice);
     setRegion(data.region);
-    setAdOffice(data.adOffice);
-    setFinancialYear(data.financialYear);
-    setMonth(data.month);
-    if (setDmData && createInitialDmData) {
-      setDmData(saved?.dmData || createInitialDmData());
-    }
-    if (setSubmitted) {
-      setSubmitted(Boolean(saved?.submitted));
-    }
-    setStorageReady(true);
-  }, [scheme.id, scheme.defaultFinancialYear, setDmData, createInitialDmData, setSubmitted]);
+    setAdOffice(resolvedAdOffice);
+    setFinancialYear(
+      data.financialYear?.includes('2025') ? data.financialYear : scheme.defaultFinancialYear
+    );
+    setMonth(data.month === 'May' ? 'July' : data.month);
+    setReady(true);
+  }, [scheme.id, scheme.defaultFinancialYear]);
 
   useEffect(() => {
-    if (!storageReady) return;
-    const payload = {
+    if (!ready) return;
+
+    if (showAdOfficeFields && adOfficeOptions.length > 0 && !adOfficeOptions.includes(adOffice)) {
+      setAdOffice(adOfficeOptions[0]);
+      return;
+    }
+
+    const payload = buildFilterPayload({
       subordinateOffice,
       region,
       adOffice,
       financialYear,
       month,
-    };
-    if (dmData !== undefined) {
-      payload.dmData = dmData;
-    }
-    if (submitted !== undefined) {
-      payload.submitted = submitted;
-    }
-    savePlantationDraft(scheme.id, payload);
+    });
+    const payloadKey = JSON.stringify(payload);
+    if (payloadKey === lastEmittedKeyRef.current) return;
+
+    lastEmittedKeyRef.current = payloadKey;
+    saveFilterPrefs(scheme.id, payload);
+    onFiltersChangeRef.current?.(payload);
   }, [
-    storageReady,
+    ready,
     scheme.id,
     subordinateOffice,
     region,
     adOffice,
     financialYear,
     month,
-    dmData,
-    submitted,
+    showAdOfficeFields,
+    adOfficeOptions,
   ]);
-
-  const notifyFilterChange = () => {
-    onFilterChange?.();
-  };
 
   const handleSubordinateOfficeChange = (nextOffice) => {
     setSubordinateOffice(nextOffice);
@@ -102,18 +121,11 @@ export function usePlantationOfficePeriodFilters(
     } else {
       setAdOffice(getDefaultAdOffice(nextOffice, region));
     }
-    notifyFilterChange();
   };
 
   const handleRegionChange = (nextRegion) => {
     setRegion(nextRegion);
     setAdOffice(resolveAdOfficeForFilter(subordinateOffice, nextRegion, adOffice));
-    notifyFilterChange();
-  };
-
-  const wrapSetter = (setter) => (value) => {
-    setter(value);
-    notifyFilterChange();
   };
 
   return {
@@ -122,9 +134,9 @@ export function usePlantationOfficePeriodFilters(
     adOffice,
     financialYear,
     month,
-    setAdOffice: wrapSetter(setAdOffice),
-    setFinancialYear: wrapSetter(setFinancialYear),
-    setMonth: wrapSetter(setMonth),
+    setAdOffice,
+    setFinancialYear,
+    setMonth,
     showRegionFields,
     showAdOfficeFields,
     adOfficeOptions,

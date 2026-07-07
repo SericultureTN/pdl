@@ -1,0 +1,75 @@
+.mis-viewer-print {
+  display: none;
+}
+
+@media print {
+  .mis-viewer-no-print {
+    display: none !important;
+  }
+
+  .mis-viewer-print {
+    display: block;
+  }
+
+  .mis-viewer-table-wrap {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+}
+
+.mis-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mis-viewer-page {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.mis-cell-ulm {
+  background: #e6f1fb;
+  color: #0c447c;
+}
+
+.mis-cell-dm {
+  background: #eaf3de;
+  color: #27500a;
+}
+
+.mis-cell-um {
+  background: #eeedfe;
+  color: #3c3489;
+}
+
+.mis-region-header td {
+  background: #f1efe8;
+  font-weight: 700;
+  color: #1a3d2b;
+}
+
+.mis-subtotal-row td {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+.mis-grand-total-row td {
+  background: #eaf3de;
+  font-weight: 700;
+  color: #1a3d2b;
+}
+
+.mis-dm-input {
+  width: 4.5rem;
+  border: 1px solid rgba(39, 80, 10, 0.25);
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.375rem;
+  text-align: right;
+  background: #fff;
+  font-size: 0.8125rem;
+}
+
+.mis-dm-input:focus {
+  outline: 2px solid #27500a;
+  outline-offset: 1px;
+}

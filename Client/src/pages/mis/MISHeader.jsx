@@ -1,14 +1,19 @@
 import { Link } from 'react-router-dom';
 import { Menu, Bell, ChevronDown, ArrowLeft } from 'lucide-react';
 
-export default function MISHeader({ title, breadcrumb }) {
+export default function MISHeader({ title, breadcrumb, onMenuClick }) {
   return (
     <header className="mis-portal-header">
       <div className="mis-portal-header-left">
-        <button type="button" className="mis-portal-hamburger" aria-label="Menu">
+        <button
+          type="button"
+          className="mis-portal-hamburger"
+          aria-label="Open menu"
+          onClick={onMenuClick}
+        >
           <Menu size={20} />
         </button>
-        <div>
+        <div className="mis-portal-header-titles">
           <h1 className="mis-portal-page-title">{title}</h1>
           <p className="mis-portal-breadcrumb">{breadcrumb}</p>
         </div>
@@ -19,11 +24,6 @@ export default function MISHeader({ title, breadcrumb }) {
           <ArrowLeft size={16} />
           <span>Back to Main Dashboard</span>
         </Link>
-        <select className="mis-portal-month-select" defaultValue="May 2024">
-          <option>May 2024</option>
-          <option>April 2024</option>
-          <option>March 2024</option>
-        </select>
 
         <button type="button" className="mis-portal-notification" aria-label="Notifications">
           <Bell size={20} />

@@ -1,19 +1,20 @@
-import { useState, useEffect } from "react";
-import { Factory, Home, Users, Settings, BarChart3, ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { Factory, Home, Users, Settings, BarChart3, ArrowLeft, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./pocpage.css";
 
 export default function POCPage() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleBackToMain = () => {
-    console.log('Navigating back to main dashboard in same tab');
     navigate('/');
   };
 
   const handleSidebarClick = (view) => {
     setActiveView(view);
+    setSidebarOpen(false);
   };
 
   const renderContent = () => {
@@ -58,8 +59,16 @@ export default function POCPage() {
 
   return (
     <div className="poc-page-container">
-      {/* Sidebar */}
-      <div className="poc-sidebar">
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="poc-sidebar-overlay"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div className={`poc-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="poc-sidebar-header">
           <h2>
             <Factory size={24} />
@@ -116,12 +125,21 @@ export default function POCPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="poc-main-content">
         <div className="poc-page-header">
           <div className="poc-page-header-left">
-            <h1>POC</h1>
-            <p>Post Cocoon</p>
+            <button
+              type="button"
+              className="poc-menu-toggle"
+              aria-label="Open menu"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <div>
+              <h1>POC</h1>
+              <p>Post Cocoon</p>
+            </div>
           </div>
           <button onClick={handleBackToMain} className="poc-back-btn">
             <ArrowLeft size={16} />

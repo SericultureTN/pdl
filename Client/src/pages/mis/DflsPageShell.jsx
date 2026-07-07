@@ -6,10 +6,10 @@ export default function DflsPageShell({
   idPrefix,
   unitLabel = 'Unit: Nos',
   showInfoBanner = true,
-  persistOptions,
+  onFiltersChange,
   children,
 }) {
-  const filters = useOfficePeriodFilters(pageKey, persistOptions);
+  const filters = useOfficePeriodFilters(pageKey, { onFiltersChange });
 
   return (
     <div className="dfls-distribution-view plantation-scheme-view plantation-scheme-friendly">

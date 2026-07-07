@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, User, Mail, Phone, MapPin, Calendar, CheckCircle } from 'lucide-react';
 import { sericulturistService } from '../services/sericulturist.js';
 import './UserForm.css';
@@ -12,17 +13,25 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
     address: user?.address || '',
     role: user?.role || '',
     ad_office: user?.ad_office || '',
-    status: user?.status || 'active'
+    status: user?.status || 'active',
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     if (error) setError('');
   };
@@ -59,99 +68,116 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
     }
   };
 
-  return (
-    <div className="user-form-overlay">
-      <div className="user-form-modal">
+  const modal = (
+    <div
+      className="user-form-overlay"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        className="user-form-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-form-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="user-form-header">
-          <h2>
+          <h2 id="user-form-title">
             {mode === 'create' ? 'Add New Sericulturist' : 'Edit Sericulturist'}
           </h2>
-          <button onClick={onClose} className="close-btn">
+          <button type="button" onClick={onClose} className="user-form-close-btn" aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="user-form">
-          <div className="form-grid">
-            <div className="form-group">
-              <label>
-                <User size={16} />
-                Name *
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                placeholder="Enter full name"
-              />
-            </div>
+          <div className="user-form-body">
+            <div className="user-form-grid">
+              <div className="user-form-group">
+                <label htmlFor="user-name">
+                  <User size={16} />
+                  Name *
+                </label>
+                <input
+                  id="user-name"
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  placeholder="Enter full name"
+                />
+              </div>
 
-            <div className="form-group">
-              <label>
-                <Mail size={16} />
-                Email *
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                placeholder="Enter email address"
-              />
-            </div>
+              <div className="user-form-group">
+                <label htmlFor="user-email">
+                  <Mail size={16} />
+                  Email *
+                </label>
+                <input
+                  id="user-email"
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  placeholder="Enter email address"
+                />
+              </div>
 
-            <div className="form-group">
-              <label>
-                <Phone size={16} />
-                Phone
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Enter phone number"
-              />
-            </div>
+              <div className="user-form-group">
+                <label htmlFor="user-phone">
+                  <Phone size={16} />
+                  Phone
+                </label>
+                <input
+                  id="user-phone"
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="Enter phone number"
+                />
+              </div>
 
-            <div className="form-group">
-              <label>
-                <Phone size={16} />
-                Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter password"
-              />
-            </div>
+              <div className="user-form-group">
+                <label htmlFor="user-password">
+                  <Phone size={16} />
+                  Password{mode === 'create' ? ' *' : ''}
+                </label>
+                <input
+                  id="user-password"
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required={mode === 'create'}
+                  placeholder={mode === 'create' ? 'Enter password' : 'Leave blank to keep current'}
+                />
+              </div>
 
-            <div className="form-group">
-              <label>
-                <MapPin size={16} />
-                Address
-              </label>
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                placeholder="Enter address"
-              />
-            </div>
+              <div className="user-form-group user-form-group-full">
+                <label htmlFor="user-address">
+                  <MapPin size={16} />
+                  Address
+                </label>
+                <input
+                  id="user-address"
+                  type="text"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Enter address"
+                />
+              </div>
 
-            <div className="form-group">
-              <label>
-                <Calendar size={16} />
-                Role
-              </label>
-
+              <div className="user-form-group">
+                <label htmlFor="user-role">
+                  <Calendar size={16} />
+                  Role
+                </label>
                 <select
+                  id="user-role"
                   name="role"
                   value={formData.role}
                   onChange={handleChange}
@@ -163,81 +189,81 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
                 </select>
               </div>
 
-            <div className="form-group">
-              <label>
-                <MapPin size={16} />
-                Section
-              </label>
-              <select
-                name="ad_office"
-                value={formData.ad_office}
-                onChange={handleChange}
-              >
-                <option value="">--Select Section--</option>
-                <option value="Hosur">Hosur</option>
-                <option value="Denkanikkottai">Denkanikkottai</option>
-                <option value="Krishnagiri">Krishnagiri</option>
-                <option value="Dharmapuri">Dharmapuri</option>
-                <option value="Pennagaram">Pennagaram</option>
-                <option value="Salem">Salem</option>
-                <option value="Coimbatore">Coimbatore</option>
-                <option value="Udumalpet">Udumalpet</option>
-                <option value="Erode">Erode</option>
-                <option value="Talavady">Talavady</option>
-                <option value="Coonoor">Coonoor</option>
-                <option value="Vaniyambadi">Vaniyambadi</option>
-                <option value="Tiruvannamalai">Tiruvannamalai</option>
-                <option value="Villuppuram">Villuppuram</option>
-                <option value="Trichy">Trichy</option>
-                <option value="Namakkal">Namakkal</option>
-                <option value="Dindigul">Dindigul</option>
-                <option value="Theni">Theni</option>
-                <option value="Tenkasi">Tenkasi</option>
-              </select>
+              <div className="user-form-group">
+                <label htmlFor="user-section">
+                  <MapPin size={16} />
+                  Section
+                </label>
+                <select
+                  id="user-section"
+                  name="ad_office"
+                  value={formData.ad_office}
+                  onChange={handleChange}
+                >
+                  <option value="">--Select Section--</option>
+                  <option value="Hosur">Hosur</option>
+                  <option value="Denkanikkottai">Denkanikkottai</option>
+                  <option value="Krishnagiri">Krishnagiri</option>
+                  <option value="Dharmapuri">Dharmapuri</option>
+                  <option value="Pennagaram">Pennagaram</option>
+                  <option value="Salem">Salem</option>
+                  <option value="Coimbatore">Coimbatore</option>
+                  <option value="Udumalpet">Udumalpet</option>
+                  <option value="Erode">Erode</option>
+                  <option value="Talavady">Talavady</option>
+                  <option value="Coonoor">Coonoor</option>
+                  <option value="Vaniyambadi">Vaniyambadi</option>
+                  <option value="Tiruvannamalai">Tiruvannamalai</option>
+                  <option value="Villuppuram">Villuppuram</option>
+                  <option value="Trichy">Trichy</option>
+                  <option value="Namakkal">Namakkal</option>
+                  <option value="Dindigul">Dindigul</option>
+                  <option value="Theni">Theni</option>
+                  <option value="Tenkasi">Tenkasi</option>
+                </select>
+              </div>
+
+              <div className="user-form-group">
+                <label htmlFor="user-status">
+                  <CheckCircle size={16} />
+                  Status
+                </label>
+                <select
+                  id="user-status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
             </div>
 
-            <div className="form-group">
-              <label>
-                <CheckCircle size={16} />
-                Status
-              </label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-              >
-                <option value="">Select status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
+            {error && <div className="user-form-error">{error}</div>}
           </div>
 
-          {error && (
-            <div className="form-error">
-              {error}
-            </div>
-          )}
-
-          <div className="form-actions">
+          <div className="user-form-actions">
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-secondary"
+              className="user-form-btn user-form-btn-secondary"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+              className="user-form-btn user-form-btn-primary"
               disabled={loading}
             >
-              {loading ? 'Saving...' : (mode === 'create' ? 'Create' : 'Update')}
+              {loading ? 'Saving...' : mode === 'create' ? 'Create User' : 'Update User'}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

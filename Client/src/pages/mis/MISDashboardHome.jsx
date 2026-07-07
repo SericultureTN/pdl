@@ -6,7 +6,7 @@ export default function MISDashboardHome() {
           <h2>Welcome to SILK SAMAGRA MIS Portal</h2>
         </div>
         <p className="mis-placeholder-text">
-          Select a module from the sidebar to begin data entry or view reports.
+          Select a module from the sidebar to begin data entry. View filtered periodicals under Reports.
         </p>
       </div>
     </div>

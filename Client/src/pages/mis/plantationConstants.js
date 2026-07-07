@@ -227,6 +227,12 @@ export function createInitialTargetData() {
   };
 }
 
+export function createEmptyTargetData() {
+  return Object.fromEntries(
+    PLANTATION_CATEGORIES.map((category) => [category, { acre: 0, farmer: 0 }])
+  );
+}
+
 export function createInitialUlmData() {
   return {
     '2.00 Acre Category': { acre: 20, farmer: 10 },
@@ -234,6 +240,12 @@ export function createInitialUlmData() {
     SCSP: { acre: 5, farmer: 3 },
     TSP: { acre: 4, farmer: 2 },
   };
+}
+
+export function createEmptyUlmData() {
+  return Object.fromEntries(
+    PLANTATION_CATEGORIES.map((category) => [category, { acre: 0, farmer: 0 }])
+  );
 }
 
 export function createInitialDmData() {

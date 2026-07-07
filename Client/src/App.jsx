@@ -9,11 +9,9 @@ import DFLsDistributionView from './pages/mis/DFLsDistributionView.jsx';
 import DFLsConsumptionView from './pages/mis/DFLsConsumptionView.jsx';
 import CocoonProductionView from './pages/mis/CocoonProductionView.jsx';
 import PlantationScheme2024View from './pages/mis/PlantationScheme2024View.jsx';
-import MISReportsLayout from './pages/mis/MISReportsLayout.jsx';
-import MISReportsDashboard from './pages/mis/MISReportsDashboard.jsx';
-import PlantationSchemeReportPage from './pages/mis/reports/PlantationSchemeReportPage.jsx';
-import DflsReportPage from './pages/mis/reports/DflsReportPage.jsx';
-import { MIS_DATA_ENTRY_ITEMS, MIS_MAIN_NAV_ITEMS, MIS_REPORT_ITEMS } from './pages/mis/misNavConfig.js';
+import { MIS_DATA_ENTRY_ITEMS, MIS_MAIN_NAV_ITEMS } from './pages/mis/misNavConfig.js';
+import MISReportViewerPage from './pages/mis-viewer/MISReportViewerPage.tsx';
+import ReportsPage from './pages/ReportsPage.tsx';
 import PLSPage from './pages/PLSPage.jsx';
 import PRCPage from './pages/PRCPage.jsx';
 import POCPage from './pages/POCPage.jsx';
@@ -58,7 +56,6 @@ function App() {
     (item) => item.placeholder && item.path !== 'dashboard'
   );
   const placeholderDataItems = MIS_DATA_ENTRY_ITEMS.filter((item) => item.placeholder);
-  const placeholderReportItems = MIS_REPORT_ITEMS.filter((item) => item.placeholder);
 
   if (loading) {
     return (
@@ -75,6 +72,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />} />
+      <Route path="/reports" element={<ReportsPage />} />
+      <Route path="/mis-viewer" element={<MISReportViewerPage userRole={user?.type === 'admin' ? 'admin' : user?.role} />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
 
       <Route path="/mis-dashboard" element={<MISDashboardLayout onLogout={handleLogout} />}>
@@ -85,24 +84,7 @@ function App() {
         <Route path="cocoon-production" element={<CocoonProductionView />} />
         <Route path="plantation-scheme-2024-25" element={<PlantationScheme2024View />} />
         <Route path="plantation-scheme-2025-26" element={<PlantationScheme2024View />} />
-        <Route path="reports" element={<MISReportsLayout />}>
-          <Route index element={<MISReportsDashboard />} />
-          <Route path="plantation-scheme-2024-25" element={<PlantationSchemeReportPage />} />
-          <Route path="plantation-scheme-2025-26" element={<PlantationSchemeReportPage />} />
-          <Route path="dfls-distribution" element={<DflsReportPage />} />
-          <Route path="dfls-consumption" element={<DflsReportPage />} />
-          <Route path="cocoon-production" element={<DflsReportPage />} />
-          {placeholderReportItems.map((item) => {
-            const segment = item.path.replace('reports/', '');
-            return (
-              <Route
-                key={item.path}
-                path={segment}
-                element={<MISPlaceholderView title={item.title} description={item.description} />}
-              />
-            );
-          })}
-        </Route>
+        <Route path="reports/*" element={<Navigate to="/reports" replace />} />
         {placeholderMainItems.map((item) => (
           <Route
             key={item.path}
