@@ -14,7 +14,12 @@ import MISReportViewerPage from './pages/mis-viewer/MISReportViewerPage.tsx';
 import ReportsPage from './pages/ReportsPage.tsx';
 import PLSPage from './pages/PLSPage.jsx';
 import PRCPage from './pages/PRCPage.jsx';
-import POCPage from './pages/POCPage.jsx';
+import POCDashboardLayout from './pages/poc/POCDashboardLayout.jsx';
+import POCDashboardHome from './pages/poc/POCDashboardHome.jsx';
+import GovernmentTwistingUnitView from './pages/poc/government-twisting-unit/GovernmentTwistingUnitView.jsx';
+import PrivateReelingUnitView from './pages/poc/private-reeling-unit/PrivateReelingUnitView.jsx';
+import GovernmentReelingUnitView from './pages/poc/government-reeling-unit/GovernmentReelingUnitView.jsx';
+import { POC_DATA_ENTRY_ITEMS, POC_MAIN_NAV_ITEMS } from './pages/poc/pocNavConfig.js';
 import { authService } from './services/auth.js';
 import './App.css';
 
@@ -56,6 +61,11 @@ function App() {
     (item) => item.placeholder && item.path !== 'dashboard'
   );
   const placeholderDataItems = MIS_DATA_ENTRY_ITEMS.filter((item) => item.placeholder);
+
+  const pocPlaceholderMainItems = POC_MAIN_NAV_ITEMS.filter(
+    (item) => item.placeholder && item.path !== 'dashboard'
+  );
+  const pocPlaceholderDataItems = POC_DATA_ENTRY_ITEMS.filter((item) => item.placeholder);
 
   if (loading) {
     return (
@@ -103,7 +113,28 @@ function App() {
 
       <Route path="/pls-dashboard" element={<PLSPage />} />
       <Route path="/prc-dashboard" element={<PRCPage />} />
-      <Route path="/poc-dashboard" element={<POCPage />} />
+      <Route path="/poc-dashboard" element={<POCDashboardLayout onLogout={handleLogout} />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<POCDashboardHome />} />
+        <Route path="reports/*" element={<Navigate to="/reports" replace />} />
+        <Route path="government-reeling-unit" element={<GovernmentReelingUnitView />} />
+        <Route path="private-reeling-unit" element={<PrivateReelingUnitView />} />
+        <Route path="twisting" element={<GovernmentTwistingUnitView />} />
+        {pocPlaceholderMainItems.map((item) => (
+          <Route
+            key={item.path}
+            path={item.path}
+            element={<MISPlaceholderView title={item.title} />}
+          />
+        ))}
+        {pocPlaceholderDataItems.map((item) => (
+          <Route
+            key={item.path}
+            path={item.path}
+            element={<MISPlaceholderView title={item.title} />}
+          />
+        ))}
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
