@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COST_DETAIL_FIELDS } from './mis37Constants.js';
 
 const nonNegativeNumber = z
   .union([z.string(), z.number()])
@@ -20,7 +21,7 @@ const requiredYear = z
 
 export const mis37HeaderSchema = z.object({
   unitName: requiredText,
-  unitCode: requiredText,
+  unitCode: z.string().optional(),
   adCode: requiredText,
   disCode: requiredText,
   regCode: requiredText,
@@ -28,27 +29,37 @@ export const mis37HeaderSchema = z.object({
   year: requiredYear,
 });
 
-const matrixRowSchema = z.object({
-  outlayDm: nonNegativeNumber,
-  outlayUm: nonNegativeNumber,
-  outlayAnnual: nonNegativeNumber,
-  expensesDm: nonNegativeNumber,
-  expensesUm: nonNegativeNumber,
-  expensesAnnual: nonNegativeNumber,
+const timePeriodSchema = z.object({
+  ulm: nonNegativeNumber,
+  dm: nonNegativeNumber,
+  um: z.any().optional(),
+});
+
+const financialCategorySchema = z.object({
+  budgetAnnual: nonNegativeNumber,
+  budgetUlM: nonNegativeNumber,
+  budgetDm: nonNegativeNumber,
+  budgetUm: z.any().optional(),
+  actualAnnual: z.any().optional(),
+});
+
+const financialRowSchema = z.object({
+  outlay: financialCategorySchema,
+  expenses: financialCategorySchema,
 });
 
 export const mis37Tab1Schema = z.object({
   achievementPhysical: z.object({
-    targetKg: nonNegativeNumber,
-    achievedKg: nonNegativeNumber,
+    target: timePeriodSchema,
+    achieved: timePeriodSchema,
   }),
   achievementFinancial: z.object({
-    salary: matrixRowSchema,
-    cocoonCost: matrixRowSchema,
-    wages: matrixRowSchema,
-    fuel: matrixRowSchema,
-    maintenance: matrixRowSchema,
-    others: matrixRowSchema,
+    salary: financialRowSchema,
+    cocoonCost: financialRowSchema,
+    wages: financialRowSchema,
+    fuel: financialRowSchema,
+    maintenance: financialRowSchema,
+    others: financialRowSchema,
   }),
   productionDetails: z.object({
     devicesInstalled: nonNegativeNumber,
@@ -68,62 +79,76 @@ export const mis37Tab1Schema = z.object({
       openingBalance: nonNegativeNumber,
       stockAdded: nonNegativeNumber,
       underProcess: nonNegativeNumber,
-      stockDisposedQty: nonNegativeNumber,
-      stockDisposedValue: nonNegativeNumber,
+      consumedSoldDisposed: nonNegativeNumber,
       closingBalance: z.any().optional(),
     })
   ),
   receipts: z.record(
     z.object({
-      valueRs: nonNegativeNumber,
-      cash: nonNegativeNumber,
+      valueRs: timePeriodSchema,
+      cash: timePeriodSchema,
     })
   ),
   silkSalesRealisation: z.record(
     z.object({
-      qtyDm: nonNegativeNumber,
-      qtyUm: nonNegativeNumber,
-      valueDm: nonNegativeNumber,
-      valueUm: nonNegativeNumber,
+      qty: timePeriodSchema,
+      value: timePeriodSchema,
     })
   ),
 });
 
-const cocoonStockRowSchema = z.object({
-  csrDuringQty: nonNegativeNumber,
-  csrDuringValue: nonNegativeNumber,
-  cbDuringQty: nonNegativeNumber,
-  cbDuringValue: nonNegativeNumber,
-  csrUptoQty: nonNegativeNumber,
-  csrUptoValue: nonNegativeNumber,
-  cbUptoQty: nonNegativeNumber,
-  cbUptoValue: nonNegativeNumber,
+const percentageNumber = z
+  .union([z.string(), z.number()])
+  .transform((val) => (val === '' || val == null ? '' : String(val)))
+  .refine(
+    (val) => val === '' || (!Number.isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100),
+    { message: 'Must be between 0 and 100' }
+  );
+
+function costDetailFieldSchema(percent = false) {
+  return z.object({
+    ulm: nonNegativeNumber,
+    dm: percent ? percentageNumber : nonNegativeNumber,
+    um: z.any().optional(),
+  });
+}
+
+const costDetailsSchema = z.object(
+  Object.fromEntries(
+    COST_DETAIL_FIELDS.map((field) => [field.key, costDetailFieldSchema(Boolean(field.percent))])
+  )
+);
+
+
+const cocoonStockStageSchema = z.object({
+  qty: timePeriodSchema,
+  value: timePeriodSchema,
 });
 
 export const mis37Tab2Schema = z.object({
   cocoonStockMovement: z.object({
-    openingBalance: cocoonStockRowSchema,
-    purchased: cocoonStockRowSchema,
-    reeled: cocoonStockRowSchema,
-    closingStock: cocoonStockRowSchema,
+    openingBalance: cocoonStockStageSchema,
+    purchased: cocoonStockStageSchema,
+    reeled: cocoonStockStageSchema,
+    closingStock: cocoonStockStageSchema,
   }),
   nscExpenditure: z.object({
-    reeledCocoonsValue: nonNegativeNumber,
-    wagesPaid: nonNegativeNumber,
-    fuelCost: nonNegativeNumber,
-    ebCharges: nonNegativeNumber,
-    maintenanceCharges: nonNegativeNumber,
-    transportCharges: nonNegativeNumber,
-    others: nonNegativeNumber,
-    total: z.any().optional(),
+    reeledCocoonsValue: timePeriodSchema,
+    wagesPaid: timePeriodSchema,
+    fuelCost: timePeriodSchema,
+    ebCharges: timePeriodSchema,
+    maintenanceCharges: timePeriodSchema,
+    transportCharges: timePeriodSchema,
+    others: timePeriodSchema,
+    total: timePeriodSchema.optional(),
   }),
-  costDetails: z.record(nonNegativeNumber),
+  costDetails: costDetailsSchema,
   costOfProduction: z.object({
-    totalNscExpenditure: z.any().optional(),
-    saleValueByeProducts: nonNegativeNumber,
-    netNscExpenditure: z.any().optional(),
-    costPerKgWithStaff: z.any().optional(),
-    costPerKgWithoutStaff: z.any().optional(),
+    totalNscExpenditure: timePeriodSchema.optional(),
+    saleValueByeProducts: timePeriodSchema,
+    netNscExpenditure: timePeriodSchema.optional(),
+    costPerKgWithStaff: timePeriodSchema,
+    costPerKgWithoutStaff: timePeriodSchema,
   }),
 });
 

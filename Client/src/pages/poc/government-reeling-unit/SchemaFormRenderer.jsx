@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { isBudgetAnnualLocked, isReportLocked } from './mis37MonthRollover.js';
 
 function getNestedValue(obj, path) {
   return path.split('.').reduce((acc, key) => acc?.[key], obj);
@@ -47,6 +48,7 @@ function FieldInput({ name, register, errors, field, readOnly }) {
 function FieldGridSection({ section, register, errors, watch }) {
   const values = watch(section.path.split('.')[0]) || {};
   const cols = section.columns || 3;
+  const locked = isReportLocked(watch()?.meta);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -77,6 +79,7 @@ function FieldGridSection({ section, register, errors, watch }) {
                   register={register}
                   errors={errors}
                   field={{ ...field, type: field.type || 'number' }}
+                  readOnly={locked}
                 />
               )}
             </label>
@@ -136,8 +139,237 @@ function MatrixSection({ section, register, errors }) {
   );
 }
 
+function isColumnEditable(col) {
+  return col.input !== false && !col.readOnly && !col.computed;
+}
+
+function TimePeriodMatrixSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">
+        U.L.M is set when the prior month is submitted (read-only). Enter D.M only. U.M = U.L.M + D.M (auto).
+      </p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-3 py-2 text-left">Particulars</th>
+              {section.columns.map((col) => (
+                <th key={col.key} className="border border-slate-200 px-3 py-2 text-center">{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.map((row) => (
+              <tr key={row.key}>
+                <td className="border border-slate-200 px-3 py-2 font-medium">{row.label}</td>
+                {section.columns.map((col) => {
+                  const name = `${section.path}.${row.key}.${col.key}`;
+                  const value = data?.[row.key]?.[col.key] ?? '';
+                  return (
+                    <td key={col.key} className="border border-slate-200 px-2 py-1">
+                      {isColumnEditable(col) && !locked ? (
+                        <input type="number" min="0" step="any" {...register(name)} className="w-full rounded border border-slate-300 px-2 py-1 text-right" />
+                      ) : (
+                        <input type="text" readOnly tabIndex={-1} value={value} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function FinancialBudgetSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const meta = watch()?.meta || {};
+  const header = watch()?.header || {};
+  const locked = isReportLocked(meta);
+  const budgetAnnualLocked = isBudgetAnnualLocked(meta, header);
+
+  const canEditColumn = (col) => {
+    if (locked) return false;
+    if (col.key === 'budgetAnnual') {
+      return isColumnEditable(col) && !budgetAnnualLocked;
+    }
+    return isColumnEditable(col);
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">
+        Budget Annual is set once per financial year (April). U.L.M is written on prior-month submit. D.M is the only monthly budget entry.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-xs">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-2 py-2 text-left" rowSpan={2}>Category</th>
+              <th className="border border-slate-200 px-2 py-2 text-left" rowSpan={2}>Type</th>
+              {section.columns.map((col) => (
+                <th key={col.key} className="border border-slate-200 px-2 py-2 text-center">{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.map((row) =>
+              section.categoryTypes.map((type, typeIdx) => (
+                <tr key={`${row.key}-${type.key}`}>
+                  {typeIdx === 0 && (
+                    <td className="border border-slate-200 px-2 py-1 font-medium" rowSpan={section.categoryTypes.length}>
+                      {row.label}
+                    </td>
+                  )}
+                  <td className="border border-slate-200 px-2 py-1">{type.label}</td>
+                  {section.columns.map((col) => {
+                    const name = `${section.path}.${row.key}.${type.key}.${col.key}`;
+                    const value = data?.[row.key]?.[type.key]?.[col.key] ?? '';
+                    return (
+                      <td key={col.key} className="border border-slate-200 px-1 py-1">
+                        {canEditColumn(col) ? (
+                          <input type="number" min="0" step="any" {...register(name)} className="w-full min-w-[70px] rounded border border-slate-300 px-1 py-1 text-right" />
+                        ) : (
+                          <input type="text" readOnly tabIndex={-1} value={value} className="w-full min-w-[70px] rounded border border-slate-200 bg-slate-50 px-1 py-1 text-right" />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ReceiptsTimePeriodSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
+  const subCols = ['valueRs', 'cash'];
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">Only D.M is editable. U.L.M is populated when the prior month is submitted.</p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-xs">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-2 py-2 text-left" rowSpan={2}>Particulars</th>
+              {subCols.map((sub) => (
+                <th key={sub} className="border border-slate-200 px-2 py-2 text-center" colSpan={3}>
+                  {sub === 'valueRs' ? 'Value (Rs)' : 'Cash'}
+                </th>
+              ))}
+            </tr>
+            <tr className="bg-emerald-muted">
+              {subCols.flatMap((sub) =>
+                section.columns.map((col) => (
+                  <th key={`${sub}-${col.key}`} className="border border-slate-200 px-1 py-1 text-center">{col.label}</th>
+                ))
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {section.items.map((item) => (
+              <tr key={item.key}>
+                <td className="border border-slate-200 px-2 py-1">{item.label}</td>
+                {subCols.flatMap((sub) =>
+                  section.columns.map((col) => {
+                    const name = `${section.path}.${item.key}.${sub}.${col.key}`;
+                    const value = data?.[item.key]?.[sub]?.[col.key] ?? '';
+                    return (
+                      <td key={`${item.key}-${sub}-${col.key}`} className="border border-slate-200 px-1 py-1">
+                        {isColumnEditable(col) && !locked ? (
+                          <input type="number" min="0" step="any" {...register(name)} className="w-full min-w-[60px] rounded border border-slate-300 px-1 py-1 text-right" />
+                        ) : (
+                          <input type="text" readOnly tabIndex={-1} value={value} className="w-full min-w-[60px] rounded border border-slate-200 bg-slate-50 px-1 py-1 text-right" />
+                        )}
+                      </td>
+                    );
+                  })
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SilkSalesTimePeriodSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
+  const subCols = [
+    { key: 'qty', label: 'Kgs' },
+    { key: 'value', label: 'Value (Rs)' },
+  ];
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">Qty and Value each use U.L.M / D.M / U.M. Only D.M is editable.</p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-xs">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-2 py-2 text-left" rowSpan={2}>Particulars</th>
+              {subCols.map((sub) => (
+                <th key={sub.key} className="border border-slate-200 px-2 py-2 text-center" colSpan={3}>{sub.label}</th>
+              ))}
+            </tr>
+            <tr className="bg-emerald-muted">
+              {subCols.flatMap((sub) =>
+                section.columns.map((col) => (
+                  <th key={`${sub.key}-${col.key}`} className="border border-slate-200 px-1 py-1 text-center">{col.label}</th>
+                ))
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.map((row) => (
+              <tr key={row.key}>
+                <td className="border border-slate-200 px-2 py-1 font-medium">{row.label}</td>
+                {subCols.flatMap((sub) =>
+                  section.columns.map((col) => {
+                    const name = `${section.path}.${row.key}.${sub.key}.${col.key}`;
+                    const value = data?.[row.key]?.[sub.key]?.[col.key] ?? '';
+                    return (
+                      <td key={`${row.key}-${sub.key}-${col.key}`} className="border border-slate-200 px-1 py-1">
+                        {isColumnEditable(col) && !locked ? (
+                          <input type="number" min="0" step="any" {...register(name)} className="w-full min-w-[60px] rounded border border-slate-300 px-1 py-1 text-right" />
+                        ) : (
+                          <input type="text" readOnly tabIndex={-1} value={value} className="w-full min-w-[60px] rounded border border-slate-200 bg-slate-50 px-1 py-1 text-right" />
+                        )}
+                      </td>
+                    );
+                  })
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function StockParticularsSection({ section, register, errors, watch }) {
   const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -161,7 +393,7 @@ function StockParticularsSection({ section, register, errors, watch }) {
                   const value = data?.[item.key]?.[col.key] ?? '';
                   return (
                     <td key={col.key} className="border border-slate-200 px-2 py-1">
-                      {col.readOnly ? (
+                      {col.readOnly || locked ? (
                         <input
                           type="text"
                           readOnly
@@ -259,6 +491,260 @@ function SilkSalesSection({ section, register, watch }) {
                 ))}
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CocoonStockTimePeriodSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
+  const dmColLabel = section.dmLabel ? `D.M (${section.dmLabel})` : 'D.M';
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">
+        Qty and Value each use U.L.M / D.M / U.M. Closing Stock is auto-derived: Opening + Purchased − Reeled (per column).
+      </p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-xs">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-2 py-2 text-left" rowSpan={2}>Stage</th>
+              {section.metrics.map((metric) => (
+                <th key={metric.key} className="border border-slate-200 px-2 py-2 text-center" colSpan={3}>
+                  {metric.label}
+                </th>
+              ))}
+            </tr>
+            <tr className="bg-emerald-muted">
+              {section.metrics.flatMap((metric) =>
+                section.columns.map((col) => (
+                  <th key={`${metric.key}-${col.key}`} className="border border-slate-200 px-1 py-1 text-center">
+                    {col.key === 'dm' ? dmColLabel : col.label}
+                  </th>
+                ))
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.map((row) => (
+              <tr key={row.key} className={row.computed ? 'bg-slate-50' : ''}>
+                <td className="border border-slate-200 px-2 py-1 font-medium">{row.label}</td>
+                {section.metrics.flatMap((metric) =>
+                  section.columns.map((col) => {
+                    const name = `${section.path}.${row.key}.${metric.key}.${col.key}`;
+                    const value = data?.[row.key]?.[metric.key]?.[col.key] ?? '';
+                    const editable = !row.computed && isColumnEditable(col) && !locked;
+                    return (
+                      <td key={`${row.key}-${metric.key}-${col.key}`} className="border border-slate-200 px-1 py-1">
+                        {editable ? (
+                          <input type="number" min="0" step="any" {...register(name)} className="w-full min-w-[60px] rounded border border-slate-300 px-1 py-1 text-right" />
+                        ) : (
+                          <input type="text" readOnly tabIndex={-1} value={value} className="w-full min-w-[60px] rounded border border-slate-200 bg-slate-50 px-1 py-1 text-right" />
+                        )}
+                      </td>
+                    );
+                  })
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function NscExpenditureTimePeriodSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">
+        All amounts in Rupees. Only D.M is editable per line. Total row sums U.L.M, D.M, and U.M across all 7 items (read-only).
+      </p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-3 py-2 text-left">Particulars</th>
+              {section.columns.map((col) => (
+                <th key={col.key} className="border border-slate-200 px-3 py-2 text-center">{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.map((row) => (
+              <tr key={row.key} className={row.computed ? 'bg-amber-50 font-semibold' : ''}>
+                <td className="border border-slate-200 px-3 py-2">{row.label}</td>
+                {section.columns.map((col) => {
+                  const name = `${section.path}.${row.key}.${col.key}`;
+                  const value = data?.[row.key]?.[col.key] ?? '';
+                  const isTotalRow = row.computed;
+                  const editable = !isTotalRow && isColumnEditable(col) && !locked;
+                  return (
+                    <td key={col.key} className="border border-slate-200 px-2 py-1">
+                      {editable ? (
+                        <input type="number" min="0" step="any" {...register(name)} className="w-full rounded border border-slate-300 px-2 py-1 text-right" />
+                      ) : (
+                        <input type="text" readOnly tabIndex={-1} value={value} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CostDetailsPeriodSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
+  const columns = section.columns || [
+    { key: 'ulm', label: 'U.L.M', readOnly: true },
+    { key: 'dm', label: 'D.M', readOnly: false, input: true },
+    { key: 'um', label: 'U.M', readOnly: true, computed: true },
+  ];
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">
+        Enter D.M from your worksheet. U.L.M is carried from last month&apos;s U.M on submit.
+        U.M = U.L.M + D.M (cumulative index — Option A, matching paper form running totals).
+      </p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-3 py-2 text-left">Particulars</th>
+              {columns.map((col) => (
+                <th key={col.key} className="border border-slate-200 px-3 py-2 text-center">{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {section.fields.map((field) => (
+              <tr key={field.key}>
+                <td className="border border-slate-200 px-3 py-2">{field.label}</td>
+                {columns.map((col) => {
+                  const name = `${section.path}.${field.key}.${col.key}`;
+                  const value = data[field.key]?.[col.key] ?? '';
+                  const editable = isColumnEditable(col) && !locked;
+                  return (
+                    <td key={col.key} className="border border-slate-200 px-2 py-1">
+                      {editable ? (
+                        <input
+                          type="number"
+                          min="0"
+                          max={field.percent ? '100' : undefined}
+                          step="any"
+                          {...register(name)}
+                          className="w-full rounded border border-slate-300 px-2 py-1 text-right"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          readOnly
+                          tabIndex={-1}
+                          value={value}
+                          className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right"
+                        />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CostOfProductionPeriodSection({ section, register, watch }) {
+  const data = getNestedValue(watch(), section.path) || {};
+  const locked = isReportLocked(watch()?.meta);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-base font-semibold text-emerald-secondary">{section.title}</h3>
+      <p className="mb-3 text-xs text-slate-500">
+        Total NSC and Net NSC are pulled/computed per column. Cost/Kg (Rs/Kg) and Sale Value of Bye Products
+        use U.L.M / D.M / U.M — enter D.M only; U.M = U.L.M + D.M.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-3 py-2 text-left">Particulars</th>
+              <th className="border border-slate-200 px-3 py-2 text-center">U.L.M</th>
+              <th className="border border-slate-200 px-3 py-2 text-center">D.M</th>
+              <th className="border border-slate-200 px-3 py-2 text-center">U.M</th>
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.map((row) => {
+              const rowData = data[row.key] || {};
+              const isEditableTimePeriod = row.timePeriod && !row.computed;
+              const isComputedRow = row.computed;
+              const label = row.unit ? `${row.label} (${row.unit})` : row.label;
+              return (
+                <tr key={row.key} className={isComputedRow ? 'bg-slate-50' : ''}>
+                  <td className="border border-slate-200 px-3 py-2 font-medium">{label}</td>
+                  {isEditableTimePeriod ? (
+                    <>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <input type="text" readOnly value={rowData.ulm ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-1">
+                        {!locked ? (
+                          <input type="number" min="0" step="any" {...register(`${section.path}.${row.key}.dm`)} className="w-full rounded border border-slate-300 px-2 py-1 text-right" />
+                        ) : (
+                          <input type="text" readOnly value={rowData.dm ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                        )}
+                      </td>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <input type="text" readOnly value={rowData.um ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      </td>
+                    </>
+                  ) : isComputedRow ? (
+                    <>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <input type="text" readOnly value={rowData.ulm ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <input type="text" readOnly value={rowData.dm ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <input type="text" readOnly value={rowData.um ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="border border-slate-200 px-2 py-1 text-center text-slate-400">—</td>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <input type="text" readOnly value={rowData.dm ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-1">
+                        <input type="text" readOnly value={rowData.um ?? ''} className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right" />
+                      </td>
+                    </>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -850,10 +1336,18 @@ function ProfitLossSingleSection({ section, watch }) {
 const SECTION_RENDERERS = {
   fieldGrid: FieldGridSection,
   matrix: MatrixSection,
+  timePeriodMatrix: TimePeriodMatrixSection,
+  financialBudget: FinancialBudgetSection,
+  cocoonStockTimePeriod: CocoonStockTimePeriodSection,
+  nscExpenditureTimePeriod: NscExpenditureTimePeriodSection,
+  costDetailsPeriod: CostDetailsPeriodSection,
+  costOfProductionPeriod: CostOfProductionPeriodSection,
   stockParticulars: StockParticularsSection,
   receipts: ReceiptsSection,
   receiptsWithTotal: ReceiptsWithTotalSection,
+  receiptsTimePeriod: ReceiptsTimePeriodSection,
   silkSales: SilkSalesSection,
+  silkSalesTimePeriod: SilkSalesTimePeriodSection,
   cocoonStock: CocoonStockSection,
   singleColumn: SingleColumnSection,
   assessedActual: AssessedActualSection,

@@ -1,10 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { CheckCircle2, ChevronLeft, ChevronRight, Printer, Save } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Lock, Printer, Save } from 'lucide-react';
+import { authService } from '../../../services/auth.js';
 import { MIS37_SHARED_HEADER_SECTION, MIS37_TAB_SECTIONS } from './mis37FormSchema.js';
 import { MIS37_TAB_SCHEMAS } from './mis37ZodSchema.js';
-import { createMis37DefaultValues, MIS37_STORAGE_KEY } from './mis37DefaultValues.js';
+import { loadMis37Draft, MIS37_STORAGE_KEY } from './mis37DefaultValues.js';
 import { applyMis37Calculations } from './mis37Calculations.js';
+import {
+  getPeriodKey,
+  isReportLocked,
+  loadMis37ReportForHeader,
+  saveMis37Report,
+  submitMis37ReportWithRollover,
+} from './mis37MonthRollover.js';
+import { FINANCIAL_BUDGET_ROWS, FINANCIAL_CATEGORY_TYPES, RECEIPT_ITEMS, SILK_SALES_ROWS, COCOON_STOCK_ROWS, COCOON_STOCK_METRICS, NSC_EXPENDITURE_ROWS, COST_DETAIL_FIELDS, COST_OF_PRODUCTION_ROWS } from './mis37Constants.js';
 import { SchemaSectionRenderer, SharedHeaderRenderer } from './SchemaFormRenderer.jsx';
 import GovernmentReelingUnitPrintView from './GovernmentReelingUnitPrintView.jsx';
 
@@ -12,31 +21,94 @@ const TAB_IDS = ['tab1', 'tab2', 'tab3'];
 const STEP_REVIEW = 'review';
 
 function loadSavedDraft() {
-  try {
-    const raw = localStorage.getItem(MIS37_STORAGE_KEY);
-    if (!raw) return createMis37DefaultValues();
-    return { ...createMis37DefaultValues(), ...JSON.parse(raw) };
-  } catch {
-    return createMis37DefaultValues();
-  }
+  return loadMis37Draft();
 }
 
 function applyComputedToForm(values, setValue) {
   const computed = applyMis37Calculations(values);
 
-  // Tab 1
+  // Tab 1: Achievement physical
+  ['target', 'achieved'].forEach((rowKey) => {
+    setValue(`tab1.achievementPhysical.${rowKey}.um`, computed.tab1.achievementPhysical[rowKey].um, { shouldDirty: false, shouldValidate: false });
+  });
+
+  // Tab 1: Achievement financial
+  FINANCIAL_BUDGET_ROWS.forEach(({ key: rowKey }) => {
+    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
+      const cat = computed.tab1.achievementFinancial[rowKey][typeKey];
+      setValue(`tab1.achievementFinancial.${rowKey}.${typeKey}.budgetUm`, cat.budgetUm, { shouldDirty: false, shouldValidate: false });
+      setValue(`tab1.achievementFinancial.${rowKey}.${typeKey}.actualAnnual`, cat.actualAnnual, { shouldDirty: false, shouldValidate: false });
+    });
+  });
+
   setValue('tab1.productionDetails.renditaPercent', computed.tab1.productionDetails.renditaPercent, { shouldDirty: false, shouldValidate: false });
   Object.entries(computed.tab1.stockParticulars).forEach(([itemKey, row]) => {
     setValue(`tab1.stockParticulars.${itemKey}.closingBalance`, row.closingBalance, { shouldDirty: false, shouldValidate: false });
   });
 
-  // Tab 2
-  setValue('tab2.nscExpenditure.total', computed.tab2.nscExpenditure.total, { shouldDirty: false, shouldValidate: false });
-  setValue('tab2.costDetails.actualRendita', computed.tab2.costDetails.actualRendita, { shouldDirty: false, shouldValidate: false });
-  setValue('tab2.costOfProduction.totalNscExpenditure', computed.tab2.costOfProduction.totalNscExpenditure, { shouldDirty: false, shouldValidate: false });
-  setValue('tab2.costOfProduction.netNscExpenditure', computed.tab2.costOfProduction.netNscExpenditure, { shouldDirty: false, shouldValidate: false });
-  setValue('tab2.costOfProduction.costPerKgWithStaff', computed.tab2.costOfProduction.costPerKgWithStaff, { shouldDirty: false, shouldValidate: false });
-  setValue('tab2.costOfProduction.costPerKgWithoutStaff', computed.tab2.costOfProduction.costPerKgWithoutStaff, { shouldDirty: false, shouldValidate: false });
+  RECEIPT_ITEMS.forEach(({ key }) => {
+    setValue(`tab1.receipts.${key}.valueRs.um`, computed.tab1.receipts[key].valueRs.um, { shouldDirty: false, shouldValidate: false });
+    setValue(`tab1.receipts.${key}.cash.um`, computed.tab1.receipts[key].cash.um, { shouldDirty: false, shouldValidate: false });
+  });
+
+  SILK_SALES_ROWS.forEach(({ key }) => {
+    setValue(`tab1.silkSalesRealisation.${key}.qty.um`, computed.tab1.silkSalesRealisation[key].qty.um, { shouldDirty: false, shouldValidate: false });
+    setValue(`tab1.silkSalesRealisation.${key}.value.um`, computed.tab1.silkSalesRealisation[key].value.um, { shouldDirty: false, shouldValidate: false });
+  });
+
+  // Tab 2: Cocoon stock movement
+  COCOON_STOCK_ROWS.forEach(({ key }) => {
+    COCOON_STOCK_METRICS.forEach(({ key: metricKey }) => {
+      ['ulm', 'dm', 'um'].forEach((col) => {
+        setValue(
+          `tab2.cocoonStockMovement.${key}.${metricKey}.${col}`,
+          computed.tab2.cocoonStockMovement[key][metricKey][col],
+          { shouldDirty: false, shouldValidate: false }
+        );
+      });
+    });
+  });
+
+  // Tab 2: NSC expenditure
+  NSC_EXPENDITURE_ROWS.filter((r) => !r.computed).forEach(({ key }) => {
+    ['ulm', 'dm', 'um'].forEach((col) => {
+      setValue(`tab2.nscExpenditure.${key}.${col}`, computed.tab2.nscExpenditure[key][col], {
+        shouldDirty: false,
+        shouldValidate: false,
+      });
+    });
+  });
+  setValue('tab2.nscExpenditure.total.ulm', computed.tab2.nscExpenditure.total.ulm, { shouldDirty: false, shouldValidate: false });
+  setValue('tab2.nscExpenditure.total.dm', computed.tab2.nscExpenditure.total.dm, { shouldDirty: false, shouldValidate: false });
+  setValue('tab2.nscExpenditure.total.um', computed.tab2.nscExpenditure.total.um, { shouldDirty: false, shouldValidate: false });
+
+  // Tab 2: Cost details — U.M = U.L.M + D.M (D.M is manual entry)
+  COST_DETAIL_FIELDS.forEach(({ key }) => {
+    setValue(`tab2.costDetails.${key}.um`, computed.tab2.costDetails[key].um, {
+      shouldDirty: false,
+      shouldValidate: false,
+    });
+  });
+
+  // Tab 2: Cost of production — computed rows sync all columns; manual rows sync U.M only
+  COST_OF_PRODUCTION_ROWS.forEach(({ key, timePeriod, computed: isComputedRow }) => {
+    const row = computed.tab2?.costOfProduction?.[key];
+    if (!row) return;
+
+    if (isComputedRow) {
+      ['ulm', 'dm', 'um'].forEach((col) => {
+        setValue(`tab2.costOfProduction.${key}.${col}`, row[col] ?? '', {
+          shouldDirty: false,
+          shouldValidate: false,
+        });
+      });
+    } else if (timePeriod) {
+      setValue(`tab2.costOfProduction.${key}.um`, row.um ?? '', {
+        shouldDirty: false,
+        shouldValidate: false,
+      });
+    }
+  });
 
   // Tab 3
   Object.entries(computed.tab3.stockDetailsKgs).forEach(([itemKey, row]) => {
@@ -110,6 +182,7 @@ export default function GovernmentReelingUnitForm() {
     handleSubmit,
     setValue,
     getValues,
+    reset,
     trigger,
     formState: { errors },
   } = useForm({
@@ -118,6 +191,31 @@ export default function GovernmentReelingUnitForm() {
   });
 
   const watchedValues = useWatch({ control });
+  const headerMonth = useWatch({ control, name: 'header.month' });
+  const headerYear = useWatch({ control, name: 'header.year' });
+  const headerUnitName = useWatch({ control, name: 'header.unitName' });
+  const reportMeta = useWatch({ control, name: 'meta' }) || {};
+  const isLocked = isReportLocked(reportMeta);
+
+  const activePeriodRef = useRef(getPeriodKey(defaultValues.header));
+  const skipPeriodSwitchRef = useRef(true);
+
+  useEffect(() => {
+    const cop = getValues('tab2.costOfProduction') || {};
+    ['saleValueByeProducts', 'costPerKgWithStaff', 'costPerKgWithoutStaff'].forEach((key) => {
+      const row = cop[key];
+      if (!row || typeof row !== 'object') {
+        setValue(`tab2.costOfProduction.${key}`, { ulm: '', dm: '', um: '' }, {
+          shouldDirty: false,
+          shouldValidate: false,
+        });
+        return;
+      }
+      if (row.ulm === undefined) {
+        setValue(`tab2.costOfProduction.${key}.ulm`, '', { shouldDirty: false, shouldValidate: false });
+      }
+    });
+  }, [getValues, setValue]);
 
   useEffect(() => {
     if (!watchedValues || Object.keys(watchedValues).length === 0) return;
@@ -128,15 +226,70 @@ export default function GovernmentReelingUnitForm() {
     if (defaultValues.meta?.savedTabs) {
       setSavedTabs(defaultValues.meta.savedTabs);
     }
+    if (defaultValues.meta?.status === 'submitted') {
+      setSubmitted(true);
+    }
   }, [defaultValues]);
+
+  useEffect(() => {
+    if (!headerUnitName || !headerMonth || !headerYear) return;
+
+    const nextKey = getPeriodKey({
+      unitName: headerUnitName,
+      month: headerMonth,
+      year: headerYear,
+    });
+    if (!nextKey) return;
+
+    if (skipPeriodSwitchRef.current) {
+      skipPeriodSwitchRef.current = false;
+      activePeriodRef.current = nextKey;
+      return;
+    }
+
+    if (nextKey === activePeriodRef.current) return;
+
+    const outgoingKey = activePeriodRef.current;
+    if (outgoingKey) {
+      const outgoing = getValues();
+      saveMis37Report(outgoingKey, {
+        ...outgoing,
+        meta: { ...outgoing.meta, savedTabs: outgoing.meta?.savedTabs ?? savedTabs },
+      });
+    }
+
+    const loaded = loadMis37ReportForHeader({
+      unitName: headerUnitName,
+      month: headerMonth,
+      year: headerYear,
+    });
+    reset(loaded);
+    setSavedTabs(loaded.meta?.savedTabs || []);
+    setSubmitted(loaded.meta?.status === 'submitted');
+    activePeriodRef.current = nextKey;
+    setMessage(
+      loaded.meta?.ulmCarriedFrom
+        ? `U.L.M values carried from ${loaded.meta.ulmCarriedFrom.replace(/\|/g, ' / ')}.`
+        : ''
+    );
+  }, [headerUnitName, headerMonth, headerYear, getValues, reset]);
 
   const currentTab = MIS37_TAB_SECTIONS.find((tab) => tab.id === activeStep);
 
   const persistDraft = (nextSavedTabs, status = 'draft') => {
+    const values = getValues();
     const payload = {
-      ...getValues(),
-      meta: { savedTabs: nextSavedTabs, status },
+      ...values,
+      meta: {
+        ...values.meta,
+        savedTabs: nextSavedTabs,
+        status: isReportLocked(values.meta) ? 'submitted' : status,
+      },
     };
+    const periodKey = getPeriodKey(payload.header);
+    if (periodKey && !isReportLocked(payload.meta)) {
+      saveMis37Report(periodKey, payload);
+    }
     localStorage.setItem(MIS37_STORAGE_KEY, JSON.stringify(payload));
   };
 
@@ -164,6 +317,11 @@ export default function GovernmentReelingUnitForm() {
   };
 
   const handleSaveAndContinue = async () => {
+    if (isLocked) {
+      setMessage('This report is submitted and locked.');
+      return;
+    }
+
     const ok = await validateStep(activeStep);
     if (!ok) return;
 
@@ -183,6 +341,11 @@ export default function GovernmentReelingUnitForm() {
   };
 
   const handleFinalSubmit = handleSubmit(async () => {
+    if (isLocked) {
+      setMessage('This report is submitted and locked.');
+      return;
+    }
+
     const allSaved = TAB_IDS.every((id) => savedTabs.includes(id));
     if (!allSaved) {
       setMessage('Save all three tabs before final submission.');
@@ -198,9 +361,34 @@ export default function GovernmentReelingUnitForm() {
       return;
     }
 
-    persistDraft(savedTabs, 'submitted');
+    let submittedBy = 'unknown';
+    try {
+      const user = await authService.getCurrentUser();
+      submittedBy = user?.email || user?.username || 'unknown';
+    } catch {
+      /* session unavailable in POC */
+    }
+
+    const result = submitMis37ReportWithRollover(getValues(), submittedBy);
+    if (!result.ok) {
+      setMessage(result.error);
+      return;
+    }
+
+    reset(result.submittedReport);
     setSubmitted(true);
-    setMessage('Report submitted successfully.');
+    setSavedTabs(result.submittedReport.meta?.savedTabs || savedTabs);
+    localStorage.setItem(MIS37_STORAGE_KEY, JSON.stringify(result.submittedReport));
+    activePeriodRef.current = getPeriodKey(result.submittedReport.header);
+
+    const nextLabel = result.nextHeader
+      ? `${result.nextHeader.month} ${result.nextHeader.year}`
+      : null;
+    setMessage(
+      nextLabel
+        ? `Report submitted and locked. ${nextLabel} draft created with U.L.M carried forward from this month's U.M values.`
+        : 'Report submitted and locked.'
+    );
   });
 
   if (showPrint) {
@@ -258,6 +446,22 @@ export default function GovernmentReelingUnitForm() {
           </div>
         )}
 
+        {isLocked && (
+          <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <Lock className="h-4 w-4 shrink-0" />
+            <span>
+              Submitted report — locked on{' '}
+              {reportMeta.submittedAt
+                ? new Date(reportMeta.submittedAt).toLocaleString()
+                : '—'}
+              {reportMeta.submittedBy ? ` by ${reportMeta.submittedBy}` : ''}.
+              {reportMeta.ulmCarriedFrom && (
+                <> U.L.M for the next month was written on submit from this report&apos;s U.M totals.</>
+              )}
+            </span>
+          </div>
+        )}
+
         {activeStep === STEP_REVIEW ? (
           <ReviewSummary values={getValues()} />
         ) : (
@@ -310,7 +514,7 @@ export default function GovernmentReelingUnitForm() {
               <Printer className="h-4 w-4" /> Print / Export
             </button>
 
-            {activeStep !== STEP_REVIEW ? (
+            {activeStep !== STEP_REVIEW && !isLocked ? (
               <button
                 type="button"
                 onClick={handleSaveAndContinue}
@@ -318,14 +522,14 @@ export default function GovernmentReelingUnitForm() {
               >
                 <Save className="h-4 w-4" /> Save &amp; Continue
               </button>
-            ) : (
+            ) : activeStep === STEP_REVIEW && !isLocked ? (
               <button
                 type="submit"
                 className="inline-flex items-center gap-2 rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-light"
               >
                 <CheckCircle2 className="h-4 w-4" /> Submit Report
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </form>

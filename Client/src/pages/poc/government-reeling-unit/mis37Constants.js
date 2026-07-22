@@ -6,6 +6,17 @@ export const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+export const TIME_PERIOD_COLUMNS = [
+  { key: 'ulm', label: 'U.L.M', readOnly: true, input: false },
+  { key: 'dm', label: 'D.M', readOnly: false, input: true },
+  { key: 'um', label: 'U.M', readOnly: true, input: false, computed: true },
+];
+
+export const ACHIEVEMENT_PHYSICAL_ROWS = [
+  { key: 'target', label: 'Target (Kgs)' },
+  { key: 'achieved', label: 'Achieved (Kgs)' },
+];
+
 export const FINANCIAL_BUDGET_ROWS = [
   { key: 'salary', label: 'Salary' },
   { key: 'cocoonCost', label: 'Cocoon Cost' },
@@ -15,16 +26,20 @@ export const FINANCIAL_BUDGET_ROWS = [
   { key: 'others', label: 'Others' },
 ];
 
-export const FINANCIAL_BUDGET_COLUMNS = [
-  { key: 'outlayDm', label: 'Outlay D.M', input: true },
-  { key: 'outlayUm', label: 'Outlay U.M', input: true },
-  { key: 'outlayAnnual', label: 'Outlay Annual', input: true },
-  { key: 'expensesDm', label: 'Expenses D.M', input: true },
-  { key: 'expensesUm', label: 'Expenses U.M', input: true },
-  { key: 'expensesAnnual', label: 'Expenses Annual', input: true },
+export const FINANCIAL_CATEGORY_TYPES = [
+  { key: 'outlay', label: 'Outlay' },
+  { key: 'expenses', label: 'Expenses' },
 ];
 
-export const STOCK_PARTICULAR_ITEMS = [
+export const FINANCIAL_BUDGET_COLUMNS = [
+  { key: 'budgetAnnual', label: 'Budget Annual', readOnly: false, input: true },
+  { key: 'budgetUlM', label: 'Budget U.L.M', readOnly: true, input: false },
+  { key: 'budgetDm', label: 'Budget D.M', readOnly: false, input: true },
+  { key: 'budgetUm', label: 'Budget U.M', readOnly: true, input: false, computed: true },
+  { key: 'actualAnnual', label: 'Actual Annual', readOnly: true, input: false, computed: true },
+];
+
+export const STOCK_PARTICULAR_ITEMS = [ 
   { key: 'cocoon', label: 'Cocoon' },
   { key: 'rawSilk', label: 'Raw Silk' },
   { key: 'silkWaste', label: 'Silk Waste' },
@@ -55,49 +70,43 @@ export const COCOON_STOCK_ROWS = [
   { key: 'openingBalance', label: 'Opening Balance' },
   { key: 'purchased', label: 'Purchased' },
   { key: 'reeled', label: 'Reeled' },
-  { key: 'closingStock', label: 'Closing Stock' },
+  { key: 'closingStock', label: 'Closing Stock', computed: true },
 ];
 
-export const COCOON_STOCK_COLUMN_GROUPS = [
-  {
-    label: 'During Month',
-    columns: [
-      { key: 'csrDuringQty', label: 'CSR Qty (kg)', input: true },
-      { key: 'csrDuringValue', label: 'CSR Value (Rs)', input: true },
-      { key: 'cbDuringQty', label: 'CB Qty (kg)', input: true },
-      { key: 'cbDuringValue', label: 'CB Value (Rs)', input: true },
-    ],
-  },
-  {
-    label: 'Upto Month',
-    columns: [
-      { key: 'csrUptoQty', label: 'CSR Qty (kg)', input: true },
-      { key: 'csrUptoValue', label: 'CSR Value (Rs)', input: true },
-      { key: 'cbUptoQty', label: 'CB Qty (kg)', input: true },
-      { key: 'cbUptoValue', label: 'CB Value (Rs)', input: true },
-    ],
-  },
+export const COCOON_STOCK_METRICS = [
+  { key: 'qty', label: 'Quantity (kg)' },
+  { key: 'value', label: 'Value (Rs)' },
 ];
 
 export const NSC_EXPENDITURE_ROWS = [
-  { key: 'reeledCocoonsValue', label: 'Reeled Cocoons Value', input: true },
-  { key: 'wagesPaid', label: 'Wages Paid', input: true },
-  { key: 'fuelCost', label: 'Fuel Cost', input: true },
-  { key: 'ebCharges', label: 'E.B. Charges', input: true },
-  { key: 'maintenanceCharges', label: 'Maintenance Charges', input: true },
-  { key: 'transportCharges', label: 'Transport Charges', input: true },
-  { key: 'others', label: 'Others', input: true },
-  { key: 'total', label: 'Total NSC Expenditure', input: false, computed: true },
+  { key: 'reeledCocoonsValue', label: 'Reeled Cocoons Value' },
+  { key: 'wagesPaid', label: 'Wages Paid' },
+  { key: 'fuelCost', label: 'Fuel Cost' },
+  { key: 'ebCharges', label: 'E.B. Charges' },
+  { key: 'maintenanceCharges', label: 'Maintenance Charges' },
+  { key: 'transportCharges', label: 'Transport Charges' },
+  { key: 'others', label: 'Others' },
+  { key: 'total', label: 'Total NSC Expenditure', computed: true },
 ];
 
 export const COST_DETAIL_FIELDS = [
-  { key: 'avgSrPercentCocoon', label: 'Average S.R.% Cocoon', assessedKey: 'assessedAvgSrPercentCocoon', actualKey: 'actualAvgSrPercentCocoon' },
-  { key: 'rendita', label: 'Rendita', assessedKey: 'assessedRendita', actualKey: 'actualRendita' },
-  { key: 'silkKg', label: 'Silk Kg', assessedKey: 'assessedSilkKg', actualKey: 'actualSilkKg' },
-  { key: 'fuelCostPerKg', label: 'Fuel Cost/Kg', assessedKey: 'assessedFuelCostPerKg', actualKey: 'actualFuelCostPerKg' },
-  { key: 'conversionCostPerKg', label: 'Conversion Cost/Kg', assessedKey: 'assessedConversionCostPerKg', actualKey: 'actualConversionCostPerKg' },
-  { key: 'mandaysPerKg', label: 'Mandays/Kg', assessedKey: 'assessedMandaysPerKg', actualKey: 'actualMandaysPerKg' },
-  { key: 'avgCocoonCostPerKg', label: 'Average Cocoon Cost/Kg', assessedKey: 'assessedAvgCocoonCostPerKg', actualKey: 'actualAvgCocoonCostPerKg' },
+  { key: 'avgSrPercentCocoon', label: 'Average S.R.% Cocoon', percent: true },
+  { key: 'assessedRendita', label: 'Assessed Rendita', percent: true },
+  { key: 'actualRendita', label: 'Actual Rendita', percent: true },
+  { key: 'assessedSilkKg', label: 'Assessed Silk Kg' },
+  { key: 'actualSilkKg', label: 'Actual Silk Kg' },
+  { key: 'fuelCostPerKg', label: 'Fuel Cost/Kg' },
+  { key: 'conversionCostPerKg', label: 'Conversion Cost/Kg' },
+  { key: 'mandaysPerKg', label: 'Mandays/Kg' },
+  { key: 'avgCocoonCostPerKg', label: 'Average Cocoon Cost/Kg' },
+];
+
+export const COST_OF_PRODUCTION_ROWS = [
+  { key: 'totalNscExpenditure', label: 'Total NSC Expenditure', computed: true, source: 'nscTotal' },
+  { key: 'saleValueByeProducts', label: 'Sale Value of Bye Products', timePeriod: true },
+  { key: 'netNscExpenditure', label: 'Net NSC Expenditure', computed: true },
+  { key: 'costPerKgWithStaff', label: 'Cost of Production/Kg (with staff)', timePeriod: true, unit: 'Rs/Kg' },
+  { key: 'costPerKgWithoutStaff', label: 'Cost of Production/Kg (without staff)', timePeriod: true, unit: 'Rs/Kg' },
 ];
 
 export const STOCK_KGS_ITEMS = [
@@ -142,7 +151,7 @@ export const MACHINERY_FIELDS = [
 
 export const HEADER_FIELDS = [
   { key: 'unitName', label: 'Unit Name', type: 'text', required: true },
-  { key: 'unitCode', label: 'Unit Code', type: 'text', required: true },
+  // { key: 'unitCode', label: 'Unit Code', type: 'text', required: true },
   { key: 'adCode', label: 'AD Code', type: 'text', required: true },
   { key: 'disCode', label: 'DIS Code', type: 'text', required: true },
   { key: 'regCode', label: 'REG Code', type: 'text', required: true },
@@ -152,22 +161,16 @@ export const HEADER_FIELDS = [
 
 export const PRODUCTION_DETAIL_FIELDS = [
   { key: 'devicesInstalled', label: 'Devices Installed' },
-  { key: 'productionCapacity', label: 'Production Capacity' },
+  { key: 'productionCapacity', label: 'Production Capacity (Kgs)', type: 'number', unit: 'kgs' },
   { key: 'devicesInUse', label: 'Devices in Use' },
   { key: 'daysWorked', label: 'Days Worked' },
   { key: 'mandaysUsed', label: 'Mandays Used' },
-  { key: 'cocoonUsedKg', label: 'Cocoon Used (kg)' },
-  { key: 'valueOfCocoonUsed', label: 'Value of Cocoon Used' },
-  { key: 'valueOfFuelUsed', label: 'Value of Fuel Used' },
-  { key: 'silkProducedQty', label: 'Qty of Silk Produced' },
-  { key: 'valueOfSilkProduced', label: 'Value of Silk Produced' },
-  { key: 'renditaPercent', label: 'Rendita %', computed: true },
+  { key: 'cocoonUsedKg', label: 'Cocoon Used (Kgs)', type: 'number', unit: 'kgs' },
+  { key: 'valueOfCocoonUsed', label: 'Value of Cocoon Used (Rs)', type: 'number', unit: 'rupees' },
+  { key: 'valueOfFuelUsed', label: 'Value of Fuel Used (Rs)', type: 'number', unit: 'rupees' },
+  { key: 'silkProducedQty', label: 'Qty of Silk Produced (Kgs)', type: 'number', unit: 'kgs' },
+  { key: 'valueOfSilkProduced', label: 'Value of Silk Produced (Rs)', type: 'number', unit: 'rupees' },
+  { key: 'renditaPercent', label: 'Rendita % (Cocoon Kg ÷ Silk Kg)', computed: true },
 ];
 
-export const COST_OF_PRODUCTION_FIELDS = [
-  { key: 'totalNscExpenditure', label: 'Total NSC Expenditure', computed: true },
-  { key: 'saleValueByeProducts', label: 'Sale Value of Bye Products', input: true },
-  { key: 'netNscExpenditure', label: 'Net NSC Expenditure (1 − 2)', computed: true },
-  { key: 'costPerKgWithStaff', label: 'Cost of Production/Kg (with staff)', computed: true },
-  { key: 'costPerKgWithoutStaff', label: 'Cost of Production/Kg (without staff)', computed: true },
-];
+export const COST_OF_PRODUCTION_FIELDS = COST_OF_PRODUCTION_ROWS;
