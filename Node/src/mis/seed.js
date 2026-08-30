@@ -1,5 +1,4 @@
 import {
-  REGIONS,
   FY_MONTHS,
   FINANCIAL_YEARS,
   PLANTATION_CATEGORIES,
@@ -27,19 +26,14 @@ function getPreviousMonthYear(month, year) {
 }
 
 export async function seedMisIfEmpty(db) {
-  const regionCount = await db.get('SELECT COUNT(*) as count FROM mis_regions');
-  const count = Number(regionCount?.count ?? 0);
+  const existing = await db.get('SELECT COUNT(*) as count FROM mis_plantation_overall');
+  const count = Number(existing?.count ?? 0);
   if (count > 0) return;
 
-  for (const region of REGIONS) {
-    const result = await db.run('INSERT INTO mis_regions (name) VALUES (?)', [region.name]);
-    const regionId = result.lastID;
-    for (const office of region.adOffices) {
-      await db.run('INSERT INTO mis_ad_offices (name, region_id) VALUES (?, ?)', [office, regionId]);
-    }
-  }
+  const misSection = await db.get(`SELECT id FROM sections WHERE code = 'MIS'`);
+  if (!misSection) return;
 
-  const offices = await db.all('SELECT id FROM mis_ad_offices ORDER BY id');
+  const offices = await db.all('SELECT id FROM poc_offices WHERE section_id = ? ORDER BY id', [misSection.id]);
   const defaultMonth = 'July';
   const defaultYear = '2025-26';
 
@@ -110,11 +104,12 @@ export async function ensureMisMonthRecords(db, month, financialYear, officeIds 
   if (officeIds?.length) {
     const placeholders = officeIds.map(() => '?').join(', ');
     offices = await db.all(
-      `SELECT id FROM mis_ad_offices WHERE id IN (${placeholders})`,
+      `SELECT id FROM poc_offices WHERE id IN (${placeholders})`,
       officeIds
     );
   } else {
-    offices = await db.all('SELECT id FROM mis_ad_offices');
+    const misSection = await db.get(`SELECT id FROM sections WHERE code = 'MIS'`);
+    offices = await db.all('SELECT id FROM poc_offices WHERE section_id = ?', [misSection?.id ?? null]);
   }
 
   for (const office of offices) {

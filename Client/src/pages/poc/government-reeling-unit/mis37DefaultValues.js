@@ -1,22 +1,17 @@
 import {
   FINANCIAL_BUDGET_ROWS,
   FINANCIAL_BUDGET_COLUMNS,
-  FINANCIAL_CATEGORY_TYPES,
   ACHIEVEMENT_PHYSICAL_ROWS,
   STOCK_PARTICULAR_ITEMS,
   RECEIPT_ITEMS,
-  SILK_SALES_ROWS,
   COCOON_STOCK_ROWS,
   NSC_EXPENDITURE_ROWS,
   COST_DETAIL_FIELDS,
   STOCK_KGS_ITEMS,
   ESTIMATED_SALE_ROWS,
-  ACTUAL_RECEIPT_SILK_ROWS,
-  ACTUAL_RECEIPT_BYE_ROWS,
-  PENDING_AMOUNT_ROWS,
-  MACHINERY_FIELDS,
   HEADER_FIELDS,
   PRODUCTION_DETAIL_FIELDS,
+  PRODUCTION_WORK_ROWS,
   COST_OF_PRODUCTION_FIELDS,
 } from './mis37Constants.js';
 
@@ -38,12 +33,7 @@ function buildAchievementPhysical() {
 
 function buildAchievementFinancial() {
   return Object.fromEntries(
-    FINANCIAL_BUDGET_ROWS.map((row) => [
-      row.key,
-      Object.fromEntries(
-        FINANCIAL_CATEGORY_TYPES.map((type) => [type.key, emptyFinancialCategory()])
-      ),
-    ])
+    FINANCIAL_BUDGET_ROWS.map((row) => [row.key, emptyFinancialCategory()])
   );
 }
 
@@ -51,7 +41,7 @@ function buildStockParticulars() {
   const fields = [
     'openingBalance',
     'stockAdded',
-    'underProcess',
+    'total',
     'consumedSoldDisposed',
     'closingBalance',
   ];
@@ -67,16 +57,7 @@ function buildReceipts() {
   return Object.fromEntries(
     RECEIPT_ITEMS.map((item) => [
       item.key,
-      { valueRs: emptyTimePeriod(), cash: emptyTimePeriod() },
-    ])
-  );
-}
-
-function buildSilkSales() {
-  return Object.fromEntries(
-    SILK_SALES_ROWS.map((row) => [
-      row.key,
-      { qty: emptyTimePeriod(), value: emptyTimePeriod() },
+      { valueRs: emptyTimePeriod() },
     ])
   );
 }
@@ -103,7 +84,7 @@ function buildNscExpenditure() {
 
 function buildCostDetails() {
   return Object.fromEntries(
-    COST_DETAIL_FIELDS.map((field) => [field.key, emptyTimePeriod()])
+    COST_DETAIL_FIELDS.map((field) => [field.key, { dm: '', um: '' }])
   );
 }
 
@@ -128,41 +109,44 @@ function buildStockKgs() {
 }
 
 function buildEstimatedSaleValue() {
-  const fields = ['dm', 'um'];
   return Object.fromEntries(
-    ESTIMATED_SALE_ROWS.map((row) => [
-      row.key,
-      Object.fromEntries(fields.map((f) => [f, ''])),
-    ])
+    ESTIMATED_SALE_ROWS.map((row) => [row.key, emptyTimePeriod()])
   );
 }
 
-function buildActualReceiptQtyValue(rows) {
-  return Object.fromEntries(
-    rows.map((row) => [row.key, { qty: '', value: '' }])
-  );
+function buildQtyValueTimePeriod() {
+  return { qty: emptyTimePeriod(), value: emptyTimePeriod() };
 }
 
-function buildPendingAmounts() {
-  return Object.fromEntries(
-    PENDING_AMOUNT_ROWS.map((row) => [row.key, ''])
-  );
+/** Current Year and Previous Year are independent rows, each U.L.M/D.M/U.M (D.M editable,
+ * U.M = U.L.M + D.M, U.L.M carried forward month to month) for both Qty and Value. */
+function buildActualReceiptQtyValue() {
+  return {
+    currentYear: buildQtyValueTimePeriod(),
+    previousYear: buildQtyValueTimePeriod(),
+  };
 }
 
 function buildSimpleFields(fields) {
   return Object.fromEntries(fields.map((f) => [f.key, '']));
 }
 
+function buildProductionDetails() {
+  return {
+    ...buildSimpleFields(PRODUCTION_DETAIL_FIELDS),
+    ...Object.fromEntries(PRODUCTION_WORK_ROWS.map((row) => [row.key, emptyTimePeriod()])),
+  };
+}
+
 export function createMis37DefaultValues() {
   return {
-    header: buildSimpleFields(HEADER_FIELDS),
+    header: { ...buildSimpleFields(HEADER_FIELDS), region: '', marketOfficeId: '' },
     tab1: {
       achievementPhysical: buildAchievementPhysical(),
       achievementFinancial: buildAchievementFinancial(),
-      productionDetails: buildSimpleFields(PRODUCTION_DETAIL_FIELDS),
+      productionDetails: buildProductionDetails(),
       stockParticulars: buildStockParticulars(),
       receipts: buildReceipts(),
-      silkSalesRealisation: buildSilkSales(),
     },
     tab2: {
       cocoonStockMovement: buildCocoonStockMovement(),
@@ -174,11 +158,9 @@ export function createMis37DefaultValues() {
       stockDetailsKgs: buildStockKgs(),
       estimatedSaleValue: buildEstimatedSaleValue(),
       actualReceiptDetails: {
-        silkSold: buildActualReceiptQtyValue(ACTUAL_RECEIPT_SILK_ROWS),
-        byeProductsSold: buildActualReceiptQtyValue(ACTUAL_RECEIPT_BYE_ROWS),
-        pendingWithExchange: buildPendingAmounts(),
+        silkSold: buildActualReceiptQtyValue(),
+        byeProductsSold: buildActualReceiptQtyValue(),
       },
-      machineryWorking: buildSimpleFields(MACHINERY_FIELDS),
       profitLoss: { dm: '', um: '', dmIsProfit: true, umIsProfit: true },
     },
     meta: {
@@ -190,7 +172,6 @@ export function createMis37DefaultValues() {
       ulmCarriedFrom: null,
       ulmCarriedAt: null,
       ulmLocked: false,
-      financialYearBudgetLocked: false,
       financialYearKey: '',
     },
   };
@@ -220,10 +201,6 @@ export function mergeMis37StoredReport(parsed) {
         parsed.tab1?.stockParticulars
       ),
       receipts: mergeReceipts(defaults.tab1.receipts, parsed.tab1?.receipts),
-      silkSalesRealisation: mergeSilkSales(
-        defaults.tab1.silkSalesRealisation,
-        parsed.tab1?.silkSalesRealisation
-      ),
     },
     tab2: { ...defaults.tab2, ...(parsed.tab2 || {}),
       cocoonStockMovement: mergeCocoonStockMovement(
@@ -237,7 +214,7 @@ export function mergeMis37StoredReport(parsed) {
         parsed.tab2?.costOfProduction
       ),
     },
-    tab3: { ...defaults.tab3, ...(parsed.tab3 || {}) },
+    tab3: mergeTab3(defaults.tab3, parsed.tab3),
     meta: { ...defaults.meta, ...(parsed.meta || {}) },
   };
 }
@@ -298,22 +275,21 @@ function mergeNscExpenditure(defaults, saved) {
   return merged;
 }
 
+// Cost Details has no U.L.M column — any U.L.M on an older saved report (from before it
+// was removed) is dropped here rather than carried into the {dm, um} shape.
 function mergeCostDetails(defaults, saved) {
   if (!saved) return defaults;
   return Object.fromEntries(
     Object.keys(defaults).map((key) => {
       const legacy = saved[key];
-      if (legacy?.ulm !== undefined || legacy?.dm !== undefined || legacy?.um !== undefined) {
-        return [key, { ...defaults[key], ...legacy }];
-      }
       if (legacy?.dm !== undefined || legacy?.um !== undefined) {
-        return [key, { ulm: '', dm: legacy.dm ?? '', um: legacy.um ?? '' }];
+        return [key, { dm: legacy.dm ?? '', um: legacy.um ?? '' }];
       }
       const legacyActual = saved[`actual${key.charAt(0).toUpperCase()}${key.slice(1)}`];
       const legacyAssessed = saved[`assessed${key.charAt(0).toUpperCase()}${key.slice(1)}`];
       if (legacyActual !== undefined || legacyAssessed !== undefined) {
         const val = legacyActual ?? legacyAssessed ?? '';
-        return [key, { ulm: '', dm: val, um: val }];
+        return [key, { dm: val, um: val }];
       }
       return [key, defaults[key]];
     })
@@ -356,19 +332,15 @@ function mergeAchievementPhysical(defaults, saved) {
   };
 }
 
+/** Rows used to be split by a Type (Outlay/Expenses) sub-key; now each row is flat. */
 function mergeAchievementFinancial(defaults, saved) {
   if (!saved) return defaults;
-  const merged = { ...defaults };
-  Object.keys(defaults).forEach((rowKey) => {
-    merged[rowKey] = { ...defaults[rowKey] };
-    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
-      merged[rowKey][typeKey] = {
-        ...defaults[rowKey][typeKey],
-        ...(saved[rowKey]?.[typeKey] || {}),
-      };
-    });
-  });
-  return merged;
+  return Object.fromEntries(
+    Object.keys(defaults).map((rowKey) => [
+      rowKey,
+      { ...defaults[rowKey], ...(saved[rowKey] || {}) },
+    ])
+  );
 }
 
 function mergeStockParticulars(defaults, saved) {
@@ -387,31 +359,77 @@ function mergeReceipts(defaults, saved) {
     Object.keys(defaults).map((key) => {
       const legacy = saved[key];
       if (legacy?.valueRs?.dm !== undefined || legacy?.valueRs?.ulm !== undefined) {
-        return [key, { ...defaults[key], ...legacy }];
+        return [key, { ...defaults[key], valueRs: legacy.valueRs }];
       }
-      return [key, {
-        valueRs: emptyTimePeriod(),
-        cash: emptyTimePeriod(),
-      }];
+      return [key, { valueRs: emptyTimePeriod() }];
     })
   );
 }
 
-function mergeSilkSales(defaults, saved) {
+function mergeEstimatedSaleValue(defaults, saved) {
   if (!saved) return defaults;
   return Object.fromEntries(
     Object.keys(defaults).map((key) => {
       const legacy = saved[key];
-      if (legacy?.qty?.dm !== undefined || legacy?.qty?.ulm !== undefined) {
-        return [key, { ...defaults[key], ...legacy }];
-      }
-      if (legacy?.qtyDm !== undefined) {
-        return [key, {
-          qty: { ulm: '', dm: legacy.qtyDm ?? '', um: legacy.qtyUm ?? '' },
-          value: { ulm: '', dm: legacy.valueDm ?? '', um: legacy.valueUm ?? '' },
-        }];
+      if (legacy?.ulm !== undefined) return [key, { ...defaults[key], ...legacy }];
+      if (legacy?.dm !== undefined) {
+        return [key, { ulm: '', dm: legacy.dm ?? '', um: legacy.um ?? '' }];
       }
       return [key, defaults[key]];
     })
   );
+}
+
+/** Both rows moved from a flat {qty,value} pair to U.L.M/D.M/U.M; old drafts had it flat. */
+function mergeTimePeriodQtyValueRow(defaults, legacy) {
+  if (!legacy) return defaults;
+  if (legacy.qty?.dm !== undefined || legacy.qty?.ulm !== undefined) {
+    return { ...defaults, ...legacy };
+  }
+  return {
+    qty: { ulm: '', dm: legacy.qty ?? '', um: '' },
+    value: { ulm: '', dm: legacy.value ?? '', um: '' },
+  };
+}
+
+/** {currentYear, previousYear}, each a {qty,value} time-period pair. Any legacy "total" on
+ * an older saved report is dropped — Actual Receipt Details no longer has total rows. */
+function mergeCurrentPreviousYearGroup(defaults, saved) {
+  if (!saved) return defaults;
+  return {
+    currentYear: mergeTimePeriodQtyValueRow(defaults.currentYear, saved.currentYear),
+    previousYear: mergeTimePeriodQtyValueRow(defaults.previousYear, saved.previousYear),
+  };
+}
+
+function mergeTab3(defaults, saved) {
+  if (!saved) return defaults;
+  return {
+    ...defaults,
+    ...saved,
+    stockDetailsKgs: {
+      ...defaults.stockDetailsKgs,
+      ...Object.fromEntries(
+        Object.keys(defaults.stockDetailsKgs).map((key) => [
+          key,
+          { ...defaults.stockDetailsKgs[key], ...(saved.stockDetailsKgs?.[key] || {}) },
+        ])
+      ),
+    },
+    estimatedSaleValue: mergeEstimatedSaleValue(
+      defaults.estimatedSaleValue,
+      saved.estimatedSaleValue
+    ),
+    actualReceiptDetails: {
+      silkSold: mergeCurrentPreviousYearGroup(
+        defaults.actualReceiptDetails.silkSold,
+        saved.actualReceiptDetails?.silkSold
+      ),
+      byeProductsSold: mergeCurrentPreviousYearGroup(
+        defaults.actualReceiptDetails.byeProductsSold,
+        saved.actualReceiptDetails?.byeProductsSold
+      ),
+    },
+    profitLoss: { ...defaults.profitLoss, ...(saved.profitLoss || {}) },
+  };
 }

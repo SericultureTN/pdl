@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, User, Mail, Phone, MapPin, Calendar, CheckCircle } from 'lucide-react';
-import { sericulturistService } from '../services/sericulturist.js';
+import { X, User, Mail, Phone, Lock, MapPin, CheckCircle, ShieldCheck } from 'lucide-react';
+import { userService } from '../services/user.js';
+import SectionGroupOfficeSelect from './SectionGroupOfficeSelect.jsx';
 import './UserForm.css';
+
+const ROLE_OPTIONS = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'secondary_admin', label: 'Secondary Admin' },
+  { value: 'user', label: 'User' },
+];
 
 export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
   const [formData, setFormData] = useState({
@@ -11,8 +18,11 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
     password: '',
     phone: user?.phone || '',
     address: user?.address || '',
-    role: user?.role || '',
-    ad_office: user?.ad_office || '',
+    role: user?.role || 'user',
+    designation: user?.designation || '',
+    section_id: user?.section_id || null,
+    group_id: user?.group_id || null,
+    office_id: user?.office_id || null,
     status: user?.status || 'active',
   });
 
@@ -36,6 +46,22 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
     if (error) setError('');
   };
 
+  const handleRoleChange = (e) => {
+    const role = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      role,
+      // Section/Group/Office only apply to role=user — clear them for admin/secondary_admin.
+      ...(role === 'user' ? {} : { section_id: null, group_id: null, office_id: null }),
+    }));
+    if (error) setError('');
+  };
+
+  const handleHierarchyChange = ({ sectionId, groupId, officeId }) => {
+    setFormData((prev) => ({ ...prev, section_id: sectionId, group_id: groupId, office_id: officeId }));
+    if (error) setError('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -49,16 +75,16 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
 
       let result;
       if (mode === 'create') {
-        result = await sericulturistService.create(payload);
+        result = await userService.create(payload);
       } else {
-        result = await sericulturistService.update(user.id, payload);
+        result = await userService.update(user.id, payload);
       }
 
       if (result.ok) {
-        onSave(result.sericulturist);
+        onSave(result.user);
         onClose();
       } else {
-        setError(result.error || 'Failed to save sericulturist');
+        setError(result.error || 'Failed to save user');
       }
     } catch (err) {
       console.error('Form submission error:', err);
@@ -67,6 +93,8 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
       setLoading(false);
     }
   };
+
+  const isUserRole = formData.role === 'user';
 
   const modal = (
     <div
@@ -83,7 +111,7 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
       >
         <div className="user-form-header">
           <h2 id="user-form-title">
-            {mode === 'create' ? 'Add New Sericulturist' : 'Edit Sericulturist'}
+            {mode === 'create' ? 'Add New User' : 'Edit User'}
           </h2>
           <button type="button" onClick={onClose} className="user-form-close-btn" aria-label="Close">
             <X size={20} />
@@ -93,7 +121,7 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
         <form onSubmit={handleSubmit} className="user-form">
           <div className="user-form-body">
             <div className="user-form-grid">
-              <div className="user-form-group">
+              <div className="user-form-group user-form-group-full">
                 <label htmlFor="user-name">
                   <User size={16} />
                   Name *
@@ -109,7 +137,7 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
                 />
               </div>
 
-              <div className="user-form-group">
+              <div className="user-form-group user-form-group-full">
                 <label htmlFor="user-email">
                   <Mail size={16} />
                   Email *
@@ -121,6 +149,7 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
                   value={formData.email}
                   onChange={handleChange}
                   required
+                  autoComplete="off"
                   placeholder="Enter email address"
                 />
               </div>
@@ -142,7 +171,7 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
 
               <div className="user-form-group">
                 <label htmlFor="user-password">
-                  <Phone size={16} />
+                  <Lock size={16} />
                   Password{mode === 'create' ? ' *' : ''}
                 </label>
                 <input
@@ -152,6 +181,7 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
                   value={formData.password}
                   onChange={handleChange}
                   required={mode === 'create'}
+                  autoComplete="new-password"
                   placeholder={mode === 'create' ? 'Enter password' : 'Leave blank to keep current'}
                 />
               </div>
@@ -173,53 +203,19 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
 
               <div className="user-form-group">
                 <label htmlFor="user-role">
-                  <Calendar size={16} />
-                  Role
+                  <ShieldCheck size={16} />
+                  Role *
                 </label>
                 <select
                   id="user-role"
                   name="role"
                   value={formData.role}
-                  onChange={handleChange}
+                  onChange={handleRoleChange}
+                  required
                 >
-                  <option value="">--Select role--</option>
-                  <option value="JIS">JIS</option>
-                  <option value="AIS">AIS</option>
-                  <option value="TA">TA</option>
-                </select>
-              </div>
-
-              <div className="user-form-group">
-                <label htmlFor="user-section">
-                  <MapPin size={16} />
-                  Section
-                </label>
-                <select
-                  id="user-section"
-                  name="ad_office"
-                  value={formData.ad_office}
-                  onChange={handleChange}
-                >
-                  <option value="">--Select Section--</option>
-                  <option value="Hosur">Hosur</option>
-                  <option value="Denkanikkottai">Denkanikkottai</option>
-                  <option value="Krishnagiri">Krishnagiri</option>
-                  <option value="Dharmapuri">Dharmapuri</option>
-                  <option value="Pennagaram">Pennagaram</option>
-                  <option value="Salem">Salem</option>
-                  <option value="Coimbatore">Coimbatore</option>
-                  <option value="Udumalpet">Udumalpet</option>
-                  <option value="Erode">Erode</option>
-                  <option value="Talavady">Talavady</option>
-                  <option value="Coonoor">Coonoor</option>
-                  <option value="Vaniyambadi">Vaniyambadi</option>
-                  <option value="Tiruvannamalai">Tiruvannamalai</option>
-                  <option value="Villuppuram">Villuppuram</option>
-                  <option value="Trichy">Trichy</option>
-                  <option value="Namakkal">Namakkal</option>
-                  <option value="Dindigul">Dindigul</option>
-                  <option value="Theni">Theni</option>
-                  <option value="Tenkasi">Tenkasi</option>
+                  {ROLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -238,6 +234,22 @@ export default function UserForm({ user, onClose, onSave, mode = 'create' }) {
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
+
+              {isUserRole && (
+                <div className="user-form-group user-form-group-full">
+                  <label>
+                    <MapPin size={16} />
+                    Section / Region / Office *
+                  </label>
+                  <SectionGroupOfficeSelect
+                    sectionId={formData.section_id}
+                    groupId={formData.group_id}
+                    officeId={formData.office_id}
+                    onChange={handleHierarchyChange}
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             {error && <div className="user-form-error">{error}</div>}

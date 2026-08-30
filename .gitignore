@@ -16,11 +16,6 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
 # Logs
 logs
 *.log

@@ -1,5 +1,4 @@
 import express from 'express';
-import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { getReport, saveDmData, rolloverMonth, buildExcelWorkbook } from './reportService.js';
 import { REGIONS, FINANCIAL_YEARS, FY_MONTHS } from './constants.js';
@@ -9,6 +8,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'local_dev_secret_change_me_in_prod
 export function createMisRouter(getDb) {
   const router = express.Router();
 
+  // Login is unified at POST /api/login (Node/src/auth.js) — this module
+  // only needs to translate that shared JWT/users-table identity into the
+  // {misRole, region_id, ad_office_id} shape reportService.js expects.
   async function resolveMisUser(req) {
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     if (!token) return null;
@@ -16,31 +18,27 @@ export function createMisRouter(getDb) {
       const decoded = jwt.verify(token, JWT_SECRET);
       const db = getDb();
 
-      if (decoded.misRole) {
-        const misUser = await db.get(
-          'SELECT id, name, email, role as misRole, region_id, ad_office_id FROM mis_users WHERE id = ?',
-          [decoded.id]
-        );
-        if (misUser) return misUser;
-      }
+      const user = await db.get(
+        'SELECT id, name, email, role, section_id, group_id, office_id, status FROM poc_users WHERE id = ?',
+        [decoded.id]
+      );
+      if (!user || user.status !== 'active') return null;
 
-      if (decoded.email) {
-        const misByEmail = await db.get(
-          'SELECT id, name, email, role as misRole, region_id, ad_office_id FROM mis_users WHERE email = ?',
-          [decoded.email]
-        );
-        if (misByEmail) return misByEmail;
-      }
+      const misSection = await db.get(`SELECT id FROM sections WHERE code = 'MIS'`);
+      const inMisSection = user.section_id === (misSection?.id ?? null);
 
-      if (decoded.type === 'admin' || decoded.role === 'admin' || decoded.misRole === 'admin') {
-        const admin = await db.get('SELECT id, email FROM admins WHERE id = ?', [decoded.id]);
-        if (admin) {
-          return { id: admin.id, email: admin.email, name: 'Administrator', misRole: 'admin', region_id: null, ad_office_id: null };
-        }
-        return { id: decoded.id, email: decoded.email, name: 'Administrator', misRole: 'admin', region_id: null, ad_office_id: null };
-      }
+      let misRole = 'ad_user';
+      if (user.role === 'admin') misRole = 'admin';
+      else if (user.role === 'secondary_admin') misRole = 'supervisor'; // cross-office, read-only
 
-      return null;
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        misRole,
+        region_id: misRole === 'ad_user' && inMisSection ? user.group_id : null,
+        ad_office_id: misRole === 'ad_user' && inMisSection ? user.office_id : null,
+      };
     } catch {
       return null;
     }
@@ -61,57 +59,6 @@ export function createMisRouter(getDb) {
     }
     next();
   }
-
-  router.post('/auth/login', async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password are required' });
-      }
-
-      const db = getDb();
-      let user = await db.get('SELECT * FROM mis_users WHERE email = ?', [email]);
-
-      if (user && (await bcrypt.compare(password, user.password_hash))) {
-        const token = jwt.sign(
-          { id: user.id, email: user.email, misRole: user.role },
-          JWT_SECRET,
-          { expiresIn: '24h' }
-        );
-        res.cookie('token', token, { httpOnly: true, secure: false, maxAge: 86400000 });
-        return res.json({
-          ok: true,
-          token,
-          user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            regionId: user.region_id,
-            adOfficeId: user.ad_office_id,
-          },
-        });
-      }
-
-      const admin = await db.get('SELECT * FROM admins WHERE email = ?', [email]);
-      if (admin && (await bcrypt.compare(password, admin.password_hash))) {
-        const token = jwt.sign({ id: admin.id, email: admin.email, type: 'admin', misRole: 'admin' }, JWT_SECRET, {
-          expiresIn: '24h',
-        });
-        res.cookie('token', token, { httpOnly: true, secure: false, maxAge: 86400000 });
-        return res.json({
-          ok: true,
-          token,
-          user: { id: admin.id, email: admin.email, name: 'Administrator', role: 'admin' },
-        });
-      }
-
-      return res.status(401).json({ error: 'Invalid credentials' });
-    } catch (error) {
-      console.error('MIS login error:', error);
-      return res.status(500).json({ error: 'Login failed' });
-    }
-  });
 
   router.get('/report', requireMisAuth, async (req, res) => {
     try {
@@ -178,50 +125,4 @@ export function createMisRouter(getDb) {
   });
 
   return router;
-}
-
-export async function seedMisUsers(db) {
-  const count = await db.get('SELECT COUNT(*) as count FROM mis_users');
-  if (count.count > 0) return;
-
-  const regions = await db.all('SELECT id, name FROM mis_regions');
-  const offices = await db.all('SELECT id, name, region_id FROM mis_ad_offices');
-  const erodeRegion = regions.find((r) => r.name === 'Erode Region');
-  const hosurOffice = offices.find((o) => o.name === 'Hosur');
-
-  const users = [
-    {
-      name: 'MIS Admin',
-      email: 'mis.admin@tn.gov.in',
-      password: 'Admin123!',
-      role: 'admin',
-      region_id: null,
-      ad_office_id: null,
-    },
-    {
-      name: 'Erode Supervisor',
-      email: 'supervisor.erode@tn.gov.in',
-      password: 'Super123!',
-      role: 'supervisor',
-      region_id: erodeRegion?.id || null,
-      ad_office_id: null,
-    },
-    {
-      name: 'Hosur AD User',
-      email: 'ad.hosur@tn.gov.in',
-      password: 'AdUser123!',
-      role: 'ad_user',
-      region_id: hosurOffice?.region_id || null,
-      ad_office_id: hosurOffice?.id || null,
-    },
-  ];
-
-  for (const user of users) {
-    const hash = await bcrypt.hash(user.password, 10);
-    await db.run(
-      'INSERT INTO mis_users (name, email, password_hash, role, region_id, ad_office_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [user.name, user.email, hash, user.role, user.region_id, user.ad_office_id]
-    );
-    console.log(`✅ MIS user: ${user.email} / ${user.password} (${user.role})`);
-  }
 }

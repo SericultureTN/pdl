@@ -26,6 +26,8 @@ export const NUMERIC_ROW_FIELDS = [
   'cocoonConsumedUm',
   'silkProductionDm',
   'silkProductionUm',
+  'silkProductionCapacityDm',
+  'silkProductionCapacityUm',
   'functionalDaysDm',
   'functionalDaysUm',
   'disposalAseDm',
@@ -56,7 +58,6 @@ export const REGISTER_COLUMNS = [
   { id: 'disposalAseUm', label: 'ASE Kanchi UM (Kgs)', type: 'number', group: 'Silk Disposal', width: 100 },
   { id: 'disposalPrivateDm', label: 'Private DM (Kgs)', type: 'number', group: 'Silk Disposal', width: 100 },
   { id: 'disposalPrivateUm', label: 'Private UM (Kgs)', type: 'number', group: 'Silk Disposal', width: 100 },
-  { id: 'remarks', label: 'Remarks', type: 'text', width: 160 },
 ];
 
 export const ABSTRACT_UNIT_TYPES = [
@@ -79,6 +80,8 @@ export const ABSTRACT_COLUMNS = [
   { id: 'cocoonConsumedUm', label: 'Cocoon Consumed UM', type: 'readonly' },
   { id: 'silkProductionDm', label: 'Silk Production DM', type: 'readonly' },
   { id: 'silkProductionUm', label: 'Silk Production UM', type: 'readonly' },
+  { id: 'silkProductionCapacityDm', label: 'Silk Production Capacity DM', type: 'readonly' },
+  { id: 'silkProductionCapacityUm', label: 'Silk Production Capacity UM', type: 'readonly' },
   { id: 'disposalAseDm', label: 'ASE Kanchi DM', type: 'readonly' },
   { id: 'disposalAseUm', label: 'ASE Kanchi UM', type: 'readonly' },
   { id: 'disposalPrivateDm', label: 'Private DM', type: 'readonly' },
@@ -86,10 +89,69 @@ export const ABSTRACT_COLUMNS = [
 ];
 
 export const HEADER_FIELDS = [
-  { key: 'assistantDirectorName', label: 'Assistant Director Name', type: 'text', required: true },
   { key: 'pdlNo', label: 'PDL No.', type: 'readonly', value: MIS40_FORM_CODE },
   { key: 'month', label: 'Month', type: 'select', required: true, options: MONTHS },
   { key: 'year', label: 'Year', type: 'number', required: true },
 ];
 
 export const EDITABLE_CATEGORY_IDS = ['arm', 'charka', 'cottage', 'mrm'];
+
+// ── Card-entry field groups (one beneficiary at a time) ──────────────────
+
+export const BENEFICIARY_FIELDS = [
+  { key: 'beneficiaryName', label: 'Name of the Beneficiary', type: 'text', required: true },
+  { key: 'place', label: 'Place', type: 'text' },
+];
+
+export const INSTALLED_FUNCTIONAL_FIELDS = [
+  { key: 'installedUnit', label: 'Installed — Unit', type: 'number' },
+  { key: 'installedDevice', label: 'Installed — Device', type: 'number' },
+  { key: 'functionalUnit', label: 'Functional — Unit', type: 'number' },
+  { key: 'functionalDevice', label: 'Functional — Device', type: 'number' },
+];
+
+/**
+ * Each entry has a D.M (editable, entered this month) and a U.M (read-only,
+ * = U.L.M + D.M). U.L.M is never entered directly — it's carried forward
+ * automatically from last month's U.M for the same beneficiary (matched by
+ * name) at submit time; see mis40MonthRollover.js.
+ */
+export const KG_FIELD_GROUPS = [
+  {
+    key: 'cocoonPurchased', section: 'Cocoon (Kgs)', label: 'Purchased',
+    ulmKey: 'cocoonPurchasedUlm', dmKey: 'cocoonPurchasedDm', umKey: 'cocoonPurchasedUm',
+  },
+  {
+    key: 'cocoonConsumed', section: 'Cocoon (Kgs)', label: 'Consumed',
+    ulmKey: 'cocoonConsumedUlm', dmKey: 'cocoonConsumedDm', umKey: 'cocoonConsumedUm',
+  },
+  {
+    key: 'silkProduction', section: 'Silk Production (Kgs)', label: 'Production',
+    ulmKey: 'silkProductionUlm', dmKey: 'silkProductionDm', umKey: 'silkProductionUm',
+  },
+  {
+    key: 'silkProductionCapacity', section: 'Silk Production (Kgs)', label: 'Production Capacity',
+    ulmKey: 'silkProductionCapacityUlm', dmKey: 'silkProductionCapacityDm', umKey: 'silkProductionCapacityUm',
+  },
+  {
+    key: 'functionalDays', section: 'Silk Production (Kgs)', label: 'Functional Days',
+    ulmKey: 'functionalDaysUlm', dmKey: 'functionalDaysDm', umKey: 'functionalDaysUm',
+  },
+  {
+    key: 'disposalAse', section: 'Silk Disposal (Kgs)', label: 'ASE Kanchi',
+    ulmKey: 'disposalAseUlm', dmKey: 'disposalAseDm', umKey: 'disposalAseUm',
+  },
+  {
+    key: 'disposalPrivate', section: 'Silk Disposal (Kgs)', label: 'Private',
+    ulmKey: 'disposalPrivateUlm', dmKey: 'disposalPrivateDm', umKey: 'disposalPrivateUm',
+  },
+];
+
+/** Columns shown in the compact saved-beneficiary list, per category. */
+export const LIST_COLUMNS = [
+  { id: 'beneficiaryName', label: 'Name' },
+  { id: 'place', label: 'Place' },
+  { id: 'cocoonConsumedDm', label: 'Cocoon Consumed (D.M)' },
+  { id: 'silkProductionDm', label: 'Silk Production (D.M)' },
+  { id: 'rendittaDm', label: 'Renditta %' },
+];

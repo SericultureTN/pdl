@@ -1,5 +1,4 @@
 import {
-  REGIONS,
   FY_MONTHS,
   FINANCIAL_YEARS,
   PLANTATION_CATEGORIES,
@@ -8,7 +7,6 @@ import {
   CB_ROWS,
   SHEETS,
   getSheetById,
-  getAdOfficesForRegion,
   getNextMonthYear,
   num,
   computeUmFromUlmDm,
@@ -58,12 +56,18 @@ function emptyDflsBlock() {
   };
 }
 
+async function getMisSectionId(db) {
+  const row = await db.get(`SELECT id FROM sections WHERE code = 'MIS'`);
+  return row?.id ?? null;
+}
+
 async function getOfficeMap(db) {
   const rows = await db.all(`
-    SELECT o.id, o.name, r.name as region_name, r.id as region_id
-    FROM mis_ad_offices o
-    JOIN mis_regions r ON r.id = o.region_id
-    ORDER BY r.id, o.id
+    SELECT o.id, o.name, g.name as region_name, g.id as region_id
+    FROM poc_offices o
+    JOIN groups g ON g.id = o.group_id
+    JOIN sections s ON s.id = o.section_id AND s.code = 'MIS'
+    ORDER BY g.id, o.id
   `);
   return rows;
 }
@@ -130,7 +134,7 @@ export async function getReport(db, { sheet, month, year, region, ad }, user = n
 
   let effectiveRegion = regionFilter;
   if (user?.misRole === 'supervisor' && user.region_id) {
-    const supervisorRegion = await db.get('SELECT name FROM mis_regions WHERE id = ?', [user.region_id]);
+    const supervisorRegion = await db.get('SELECT name FROM groups WHERE id = ?', [user.region_id]);
     if (supervisorRegion) {
       effectiveRegion = supervisorRegion.name;
     }
@@ -187,6 +191,12 @@ export async function getReport(db, { sheet, month, year, region, ad }, user = n
         ? [user.ad_office_id]
         : [];
 
+  const misSectionId = await getMisSectionId(db);
+  const misGroups = await db.all('SELECT id, name FROM groups WHERE section_id = ? ORDER BY name', [misSectionId]);
+  const adOfficesMeta = (
+    effectiveRegion === 'All' ? allOffices : allOffices.filter((o) => o.region_name === effectiveRegion)
+  ).map((o) => ({ name: o.name, region: o.region_name, regionId: o.region_id }));
+
   return {
     ok: true,
     sheet: sheetMeta,
@@ -197,8 +207,8 @@ export async function getReport(db, { sheet, month, year, region, ad }, user = n
     meta: {
       canEditDm,
       editableAdIds,
-      regions: REGIONS.map((r) => ({ id: r.id, name: r.name })),
-      adOffices: getAdOfficesForRegion(effectiveRegion === 'All' ? 'All Regions' : effectiveRegion),
+      regions: misGroups,
+      adOffices: adOfficesMeta,
       financialYears: FINANCIAL_YEARS,
       months: FY_MONTHS,
       sheets: SHEETS,
@@ -425,7 +435,8 @@ export async function rolloverMonth(db, month, year) {
   }
 
   const next = getNextMonthYear(month, year);
-  const offices = await db.all('SELECT id FROM mis_ad_offices');
+  const misSectionId = await getMisSectionId(db);
+  const offices = await db.all('SELECT id FROM poc_offices WHERE section_id = ?', [misSectionId]);
 
   for (const office of offices) {
     const overall = await db.get(

@@ -1,5 +1,5 @@
 import { ABSTRACT_UNIT_TYPES, NUMERIC_ROW_FIELDS } from './mis40Constants.js';
-import { computeTotalRow } from './mis40Calculations.js';
+import { computeRowsWithCalculations, computeTotalRow } from './mis40Calculations.js';
 
 function num(value) {
   const parsed = Number(value);
@@ -43,7 +43,10 @@ export function computeAbstractFromCategories(categories = {}) {
     });
 
     if (unitType.sourceCategory && Array.isArray(safeCategories[unitType.sourceCategory]?.rows)) {
-      const sourceRows = safeCategories[unitType.sourceCategory].rows;
+      // U.M is never persisted on the stored row (only computed for display) —
+      // recompute from U.L.M + D.M here, same as computeTotalRow does, or
+      // every *Um column below would silently sum to 0.
+      const sourceRows = computeRowsWithCalculations(safeCategories[unitType.sourceCategory].rows);
       NUMERIC_ROW_FIELDS.forEach((field) => {
         row[field] = round2(sourceRows.reduce((acc, r) => acc + num(r[field]), 0));
       });

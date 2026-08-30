@@ -1,16 +1,15 @@
 import {
   MONTHS,
-  FINANCIAL_BUDGET_ROWS,
-  FINANCIAL_CATEGORY_TYPES,
   ACHIEVEMENT_PHYSICAL_ROWS,
+  PRODUCTION_WORK_ROWS,
   RECEIPT_ITEMS,
-  SILK_SALES_ROWS,
   COCOON_STOCK_ROWS,
   NSC_EXPENDITURE_ROWS,
-  COST_DETAIL_FIELDS,
+  STOCK_PARTICULAR_ITEMS,
 } from './mis37Constants.js';
 import { applyMis37Calculations } from './mis37Calculations.js';
 import { createMis37DefaultValues, mergeMis37StoredReport } from './mis37DefaultValues.js';
+import { isFiscalYearStart } from './deriveMonthlyFromAnnual.js';
 
 /** @deprecated Legacy archive — migrated into MIS37_REPORTS_KEY on read */
 export const MIS37_ARCHIVE_KEY = 'pdl-mis37-government-reeling-unit-archive';
@@ -46,10 +45,6 @@ export function getFinancialYearKey(month, year) {
   if (monthIndex === -1 || !Number.isFinite(y)) return '';
   if (monthIndex >= 3) return `${y}-${y + 1}`;
   return `${y - 1}-${y}`;
-}
-
-export function isFirstMonthOfFinancialYear(month) {
-  return month === 'April';
 }
 
 function migrateLegacyArchive(store) {
@@ -112,9 +107,9 @@ export function findSubmittedReport(unitName, period) {
 export function extractCarryForwardFromTab1(tab1) {
   const carry = {
     achievementPhysical: {},
-    achievementFinancial: {},
+    productionDetails: {},
     receipts: {},
-    silkSalesRealisation: {},
+    stockParticulars: {},
   };
 
   ACHIEVEMENT_PHYSICAL_ROWS.forEach(({ key }) => {
@@ -123,37 +118,38 @@ export function extractCarryForwardFromTab1(tab1) {
     };
   });
 
-  FINANCIAL_BUDGET_ROWS.forEach(({ key: rowKey }) => {
-    carry.achievementFinancial[rowKey] = {};
-    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
-      carry.achievementFinancial[rowKey][typeKey] = {
-        budgetUlM: tab1.achievementFinancial?.[rowKey]?.[typeKey]?.budgetUm ?? '',
-      };
-    });
+  PRODUCTION_WORK_ROWS.forEach(({ key }) => {
+    carry.productionDetails[key] = {
+      ulm: tab1.productionDetails?.[key]?.um ?? '',
+    };
   });
+
+  // achievementFinancial is intentionally not carried forward — Budget Outlay
+  // is the full yearly figure (flat, unchanged every month) and Expenses is a
+  // plain per-month manual entry; neither has a U.L.M to carry.
 
   RECEIPT_ITEMS.forEach(({ key }) => {
     carry.receipts[key] = {
       valueRs: { ulm: tab1.receipts?.[key]?.valueRs?.um ?? '' },
-      cash: { ulm: tab1.receipts?.[key]?.cash?.um ?? '' },
     };
   });
 
-  SILK_SALES_ROWS.forEach(({ key }) => {
-    carry.silkSalesRealisation[key] = {
-      qty: { ulm: tab1.silkSalesRealisation?.[key]?.qty?.um ?? '' },
-      value: { ulm: tab1.silkSalesRealisation?.[key]?.value?.um ?? '' },
+  // Stock Particulars: next month's Opening Balance = this month's Closing Balance, per item.
+  STOCK_PARTICULAR_ITEMS.forEach(({ key }) => {
+    carry.stockParticulars[key] = {
+      openingBalance: tab1.stockParticulars?.[key]?.closingBalance ?? '',
     };
   });
 
   return carry;
 }
 
+// Cost Details has no U.L.M column and does not participate in rollover — every field
+// there is a rate/ratio recomputed fresh each month (see mis37Constants.js).
 export function extractCarryForwardFromTab2(tab2) {
   const carry = {
     cocoonStockMovement: {},
     nscExpenditure: {},
-    costDetails: {},
     costOfProduction: {
       saleValueByeProducts: {},
       costPerKgWithStaff: {},
@@ -182,90 +178,105 @@ export function extractCarryForwardFromTab2(tab2) {
     ulm: tab2.costOfProduction?.costPerKgWithoutStaff?.um ?? '',
   };
 
-  COST_DETAIL_FIELDS.forEach(({ key }) => {
-    carry.costDetails[key] = { ulm: tab2.costDetails?.[key]?.um ?? '' };
-  });
-
   return carry;
 }
 
-export function extractCarryForwardFromReport(tab1, tab2) {
+// Every leaf row-group in Section VII (Silk Sold, Bye Products Sold) rolls forward the
+// same way: Current Year AND Previous Year each carry their U.M into next month's U.L.M,
+// independently for Qty and Value. No pending or total rows exist in this section.
+const ACTUAL_RECEIPT_ROW_GROUPS = ['silkSold', 'byeProductsSold'];
+
+export function extractCarryForwardFromTab3(tab3) {
+  const actualReceiptDetails = {};
+  ACTUAL_RECEIPT_ROW_GROUPS.forEach((rowKey) => {
+    actualReceiptDetails[rowKey] = {};
+    ['currentYear', 'previousYear'].forEach((periodKey) => {
+      actualReceiptDetails[rowKey][periodKey] = {
+        qty: { ulm: tab3.actualReceiptDetails?.[rowKey]?.[periodKey]?.qty?.um ?? '' },
+        value: { ulm: tab3.actualReceiptDetails?.[rowKey]?.[periodKey]?.value?.um ?? '' },
+      };
+    });
+  });
+
   return {
-    tab1: extractCarryForwardFromTab1(tab1),
-    tab2: extractCarryForwardFromTab2(tab2),
+    estimatedSaleValue: {
+      rawSilk: { ulm: tab3.estimatedSaleValue?.rawSilk?.um ?? '' },
+    },
+    actualReceiptDetails,
   };
 }
 
-function extractBudgetAnnualFromTab1(tab1) {
-  const budget = {};
-  FINANCIAL_BUDGET_ROWS.forEach(({ key: rowKey }) => {
-    budget[rowKey] = {};
-    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
-      budget[rowKey][typeKey] =
-        tab1.achievementFinancial?.[rowKey]?.[typeKey]?.budgetAnnual ?? '';
-    });
-  });
-  return budget;
-}
+/** Updates Tab 3 U.L.M fields only — every Section VII row (Current Year AND Previous Year
+ * roll forward identically) plus Raw Silk Sale Value. */
+export function applyCarryForwardTab3UlmOnly(tab3, carryForward) {
+  const next = structuredClone(tab3);
 
-function hasAnyBudgetAnnual(tab1) {
-  return FINANCIAL_BUDGET_ROWS.some(({ key: rowKey }) =>
-    FINANCIAL_CATEGORY_TYPES.some(({ key: typeKey }) => {
-      const val = tab1.achievementFinancial?.[rowKey]?.[typeKey]?.budgetAnnual;
-      return val !== '' && val != null;
-    })
-  );
-}
+  if (carryForward.estimatedSaleValue?.rawSilk?.ulm !== undefined) {
+    next.estimatedSaleValue.rawSilk.ulm = carryForward.estimatedSaleValue.rawSilk.ulm;
+  }
 
-function applyBudgetAnnualToTab1(tab1, budgetAnnual) {
-  const next = structuredClone(tab1);
-  FINANCIAL_BUDGET_ROWS.forEach(({ key: rowKey }) => {
-    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
-      if (budgetAnnual[rowKey]?.[typeKey] !== undefined) {
-        next.achievementFinancial[rowKey][typeKey].budgetAnnual =
-          budgetAnnual[rowKey][typeKey];
+  ACTUAL_RECEIPT_ROW_GROUPS.forEach((rowKey) => {
+    const carried = carryForward.actualReceiptDetails?.[rowKey];
+    ['currentYear', 'previousYear'].forEach((periodKey) => {
+      const periodCarry = carried?.[periodKey];
+      if (periodCarry?.qty?.ulm !== undefined) {
+        next.actualReceiptDetails[rowKey][periodKey].qty.ulm = periodCarry.qty.ulm;
+      }
+      if (periodCarry?.value?.ulm !== undefined) {
+        next.actualReceiptDetails[rowKey][periodKey].value.ulm = periodCarry.value.ulm;
       }
     });
   });
+
   return next;
 }
 
-/** Updates U.L.M / Budget U.L.M only — never clears or overwrites D.M entries. */
-export function applyCarryForwardUlmOnly(tab1, carryForward) {
-  const next = structuredClone(tab1);
+export function extractCarryForwardFromReport(tab1, tab2, tab3) {
+  return {
+    tab1: extractCarryForwardFromTab1(tab1),
+    tab2: extractCarryForwardFromTab2(tab2),
+    tab3: extractCarryForwardFromTab3(tab3),
+  };
+}
 
-  ACHIEVEMENT_PHYSICAL_ROWS.forEach(({ key }) => {
+/** Updates U.L.M / Budget U.L.M / Stock Particulars Opening Balance only — never clears
+ * or overwrites D.M entries. Opening Balance rolls forward the same way U.L.M does:
+ * next month's Opening Balance = this month's Closing Balance, per stock item.
+ * `targetMonth` is the month being rolled INTO — fields flagged
+ * resetAtFiscalYearStart (Target, Budget Outlay, Expenses) get U.L.M forced to
+ * 0 instead of carried when that's April, so they start fresh each fiscal year. */
+export function applyCarryForwardUlmOnly(tab1, carryForward, targetMonth) {
+  const next = structuredClone(tab1);
+  const resetting = isFiscalYearStart(targetMonth);
+
+  ACHIEVEMENT_PHYSICAL_ROWS.forEach(({ key, resetAtFiscalYearStart }) => {
+    if (resetting && resetAtFiscalYearStart) {
+      next.achievementPhysical[key].ulm = 0;
+      return;
+    }
     if (carryForward.achievementPhysical?.[key]?.ulm !== undefined) {
       next.achievementPhysical[key].ulm = carryForward.achievementPhysical[key].ulm;
     }
   });
 
-  FINANCIAL_BUDGET_ROWS.forEach(({ key: rowKey }) => {
-    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
-      const carried = carryForward.achievementFinancial?.[rowKey]?.[typeKey]?.budgetUlM;
-      if (carried !== undefined) {
-        next.achievementFinancial[rowKey][typeKey].budgetUlM = carried;
-      }
-    });
+  PRODUCTION_WORK_ROWS.forEach(({ key }) => {
+    if (carryForward.productionDetails?.[key]?.ulm !== undefined) {
+      next.productionDetails[key].ulm = carryForward.productionDetails[key].ulm;
+    }
   });
+
+  // achievementFinancial is not carried forward — see extractCarryForwardFromTab1.
 
   RECEIPT_ITEMS.forEach(({ key }) => {
     if (carryForward.receipts?.[key]?.valueRs?.ulm !== undefined) {
       next.receipts[key].valueRs.ulm = carryForward.receipts[key].valueRs.ulm;
     }
-    if (carryForward.receipts?.[key]?.cash?.ulm !== undefined) {
-      next.receipts[key].cash.ulm = carryForward.receipts[key].cash.ulm;
-    }
   });
 
-  SILK_SALES_ROWS.forEach(({ key }) => {
-    if (carryForward.silkSalesRealisation?.[key]?.qty?.ulm !== undefined) {
-      next.silkSalesRealisation[key].qty.ulm =
-        carryForward.silkSalesRealisation[key].qty.ulm;
-    }
-    if (carryForward.silkSalesRealisation?.[key]?.value?.ulm !== undefined) {
-      next.silkSalesRealisation[key].value.ulm =
-        carryForward.silkSalesRealisation[key].value.ulm;
+  STOCK_PARTICULAR_ITEMS.forEach(({ key }) => {
+    const carried = carryForward.stockParticulars?.[key]?.openingBalance;
+    if (carried !== undefined) {
+      next.stockParticulars[key].openingBalance = carried;
     }
   });
 
@@ -320,46 +331,7 @@ export function applyCarryForwardTab2UlmOnly(tab2, carryForward) {
       carryForward.costOfProduction.costPerKgWithoutStaff.ulm;
   }
 
-  COST_DETAIL_FIELDS.forEach(({ key }) => {
-    if (carryForward.costDetails?.[key]?.ulm !== undefined) {
-      next.costDetails[key].ulm = carryForward.costDetails[key].ulm;
-    }
-  });
-
   return next;
-}
-
-function findFinancialYearBudgetAnnual(reports, header) {
-  const fyKey = getFinancialYearKey(header.month, header.year);
-  if (!fyKey || !header.unitName) return null;
-
-  const candidates = Object.entries(reports)
-    .filter(([key, report]) => {
-      if (!key.startsWith(`${header.unitName}|`)) return false;
-      if (report.meta?.status !== 'submitted') return false;
-      const month = report.header?.month;
-      const year = report.header?.year;
-      return getFinancialYearKey(month, year) === fyKey && hasAnyBudgetAnnual(report.tab1);
-    })
-    .sort(([keyA], [keyB]) => {
-      const [, yearA, monthA] = keyA.split('|');
-      const [, yearB, monthB] = keyB.split('|');
-      const idxA = MONTHS.indexOf(monthA);
-      const idxB = MONTHS.indexOf(monthB);
-      if (Number(yearA) !== Number(yearB)) return Number(yearA) - Number(yearB);
-      return idxA - idxB;
-    });
-
-  if (candidates.length === 0) return null;
-  return extractBudgetAnnualFromTab1(candidates[0][1].tab1);
-}
-
-function applyBudgetAnnualForPeriod(tab1, header, reports, priorSubmittedTab1) {
-  if (isFirstMonthOfFinancialYear(header.month)) return tab1;
-  const fyBudget =
-    findFinancialYearBudgetAnnual(reports, header) ||
-    (priorSubmittedTab1 ? extractBudgetAnnualFromTab1(priorSubmittedTab1) : null);
-  return fyBudget ? applyBudgetAnnualToTab1(tab1, fyBudget) : tab1;
 }
 
 /**
@@ -372,40 +344,44 @@ export function loadMis37ReportForHeader(header) {
   if (!periodKey) return defaults;
 
   const stored = getMis37Report(periodKey);
-  if (stored) {
-    return mergeMis37StoredReport(stored);
-  }
+  let report = stored
+    ? mergeMis37StoredReport(stored)
+    : mergeMis37StoredReport({ ...defaults, header: { ...defaults.header, ...header } });
 
-  const reports = loadMis37Reports();
-  let report = mergeMis37StoredReport({
-    ...defaults,
-    header: { ...defaults.header, ...header },
-  });
+  // Once this period is itself submitted/locked, its own data is final —
+  // never re-derive U.L.M from a prior period again.
+  if (isReportLocked(report.meta)) {
+    return report;
+  }
 
   const priorPeriod = getPreviousPeriod(header.month, header.year);
-  const priorSubmitted = findSubmittedReport(header.unitName, priorPeriod);
-  if (priorSubmitted) {
-    const computedPrior = applyMis37Calculations(priorSubmitted);
-    const carryForward = extractCarryForwardFromReport(computedPrior.tab1, computedPrior.tab2);
-    report.tab1 = applyCarryForwardUlmOnly(report.tab1, carryForward.tab1);
-    report.tab2 = applyCarryForwardTab2UlmOnly(report.tab2, carryForward.tab2);
-    report.meta = {
-      ...report.meta,
-      ulmCarriedFrom: getPeriodKey(priorSubmitted.header),
-      ulmCarriedAt: priorSubmitted.meta?.submittedAt || null,
-      ulmLocked: true,
-    };
-    report.tab1 = applyBudgetAnnualForPeriod(
-      report.tab1,
-      header,
-      reports,
-      computedPrior.tab1
-    );
-    if (!isFirstMonthOfFinancialYear(header.month)) {
-      report.meta.financialYearBudgetLocked = true;
-    }
-    report.meta.financialYearKey = getFinancialYearKey(header.month, header.year);
+  const priorSubmitted = priorPeriod ? findSubmittedReport(header.unitName, priorPeriod) : null;
+  if (!priorSubmitted) {
+    return report;
   }
+
+  const priorKey = getPeriodKey(priorSubmitted.header);
+  // Re-derive whenever this draft hasn't yet carried from this exact prior
+  // submission — covers both "never carried" (new draft, or one created
+  // before the prior month was submitted) and "prior month was resubmitted
+  // with different figures since we last carried". D.M/manually-entered
+  // values are untouched — only the U.L.M fields are overwritten.
+  if (stored && report.meta?.ulmCarriedFrom === priorKey) {
+    return report;
+  }
+
+  const computedPrior = applyMis37Calculations(priorSubmitted);
+  const carryForward = extractCarryForwardFromReport(computedPrior.tab1, computedPrior.tab2, computedPrior.tab3);
+  report.tab1 = applyCarryForwardUlmOnly(report.tab1, carryForward.tab1, header.month);
+  report.tab2 = applyCarryForwardTab2UlmOnly(report.tab2, carryForward.tab2);
+  report.tab3 = applyCarryForwardTab3UlmOnly(report.tab3, carryForward.tab3);
+  report.meta = {
+    ...report.meta,
+    ulmCarriedFrom: priorKey,
+    ulmCarriedAt: priorSubmitted.meta?.submittedAt || null,
+    ulmLocked: true,
+    financialYearKey: getFinancialYearKey(header.month, header.year),
+  };
 
   return report;
 }
@@ -452,8 +428,7 @@ export function submitMis37ReportWithRollover(report, submittedBy = 'unknown') {
     year: nextPeriod.year,
   };
   const nextKey = getPeriodKey(nextHeader);
-  const carryForward = extractCarryForwardFromReport(computed.tab1, computed.tab2);
-  const reports = loadMis37Reports();
+  const carryForward = extractCarryForwardFromReport(computed.tab1, computed.tab2, computed.tab3);
 
   let nextDraft = getMis37Report(nextKey);
   if (nextDraft?.meta?.status === 'submitted') {
@@ -474,14 +449,9 @@ export function submitMis37ReportWithRollover(report, submittedBy = 'unknown') {
     nextDraft = mergeMis37StoredReport({ ...nextDraft, header: { ...nextDraft.header, ...nextHeader } });
   }
 
-  nextDraft.tab1 = applyCarryForwardUlmOnly(nextDraft.tab1, carryForward.tab1);
+  nextDraft.tab1 = applyCarryForwardUlmOnly(nextDraft.tab1, carryForward.tab1, nextPeriod.month);
   nextDraft.tab2 = applyCarryForwardTab2UlmOnly(nextDraft.tab2, carryForward.tab2);
-  nextDraft.tab1 = applyBudgetAnnualForPeriod(
-    nextDraft.tab1,
-    nextHeader,
-    { ...reports, [periodKey]: submittedReport },
-    computed.tab1
-  );
+  nextDraft.tab3 = applyCarryForwardTab3UlmOnly(nextDraft.tab3, carryForward.tab3);
 
   nextDraft.meta = {
     ...nextDraft.meta,
@@ -493,7 +463,6 @@ export function submitMis37ReportWithRollover(report, submittedBy = 'unknown') {
     ulmCarriedAt: submittedAt,
     ulmLocked: true,
     financialYearKey: getFinancialYearKey(nextPeriod.month, nextPeriod.year),
-    financialYearBudgetLocked: !isFirstMonthOfFinancialYear(nextPeriod.month),
   };
 
   saveMis37Report(nextKey, nextDraft);
@@ -527,51 +496,25 @@ export function isReportLocked(meta) {
   return meta?.status === 'submitted' || meta?.locked === true;
 }
 
-export function isBudgetAnnualLocked(meta, header) {
-  if (isReportLocked(meta)) return true;
-  if (meta?.financialYearBudgetLocked) return true;
-  if (header?.month && !isFirstMonthOfFinancialYear(header.month)) return true;
-  return false;
-}
-
 export function applyTab1UlmToForm(tab1, setValue) {
-  ACHIEVEMENT_PHYSICAL_ROWS.forEach(({ key }) => {
+  ACHIEVEMENT_PHYSICAL_ROWS.filter((r) => !r.noCarryForward).forEach(({ key }) => {
     setValue(`tab1.achievementPhysical.${key}.ulm`, tab1.achievementPhysical[key].ulm, {
       shouldDirty: false,
       shouldValidate: false,
     });
   });
 
-  FINANCIAL_BUDGET_ROWS.forEach(({ key: rowKey }) => {
-    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
-      setValue(
-        `tab1.achievementFinancial.${rowKey}.${typeKey}.budgetUlM`,
-        tab1.achievementFinancial[rowKey][typeKey].budgetUlM,
-        { shouldDirty: false, shouldValidate: false }
-      );
-      setValue(
-        `tab1.achievementFinancial.${rowKey}.${typeKey}.budgetAnnual`,
-        tab1.achievementFinancial[rowKey][typeKey].budgetAnnual,
-        { shouldDirty: false, shouldValidate: false }
-      );
+  PRODUCTION_WORK_ROWS.forEach(({ key }) => {
+    setValue(`tab1.productionDetails.${key}.ulm`, tab1.productionDetails[key].ulm, {
+      shouldDirty: false,
+      shouldValidate: false,
     });
   });
 
   RECEIPT_ITEMS.forEach(({ key }) => {
-    ['valueRs', 'cash'].forEach((sub) => {
-      setValue(`tab1.receipts.${key}.${sub}.ulm`, tab1.receipts[key][sub].ulm, {
-        shouldDirty: false,
-        shouldValidate: false,
-      });
-    });
-  });
-
-  SILK_SALES_ROWS.forEach(({ key }) => {
-    ['qty', 'value'].forEach((sub) => {
-      setValue(`tab1.silkSalesRealisation.${key}.${sub}.ulm`, tab1.silkSalesRealisation[key][sub].ulm, {
-        shouldDirty: false,
-        shouldValidate: false,
-      });
+    setValue(`tab1.receipts.${key}.valueRs.ulm`, tab1.receipts[key].valueRs.ulm, {
+      shouldDirty: false,
+      shouldValidate: false,
     });
   });
 }

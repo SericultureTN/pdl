@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import cocoonLogo from '../assets/login-bg.png';
 import { authService } from '../services/auth.js';
-import { sericulturistService } from "../services/sericulturist.js";
+import { userService } from "../services/user.js";
+import { safeJsonParse } from "../utils/safeJson.js";
 import UserList from "./UserList.jsx";
 import MISDashboard from "./MISDashboard.jsx";
 import PLSDashboard from "./PLSDashboard.jsx";
@@ -59,12 +60,12 @@ export default function Dashboard({ user, onLogout }) {
               'Content-Type': 'application/json',
             },
           }),
-          sericulturistService.getStatistics(),
+          userService.getStatistics(),
         ]);
         
-        const dashboard = await dashboardRes.json();
-        
-        if (dashboard.ok) {
+        const dashboard = dashboardRes.ok ? await safeJsonParse(dashboardRes, 'get dashboard') : null;
+
+        if (dashboard?.ok) {
           setDashboardData(dashboard);
           setStatistics(dashboard.statistics || statsRes.statistics);
         } else {
@@ -76,10 +77,9 @@ export default function Dashboard({ user, onLogout }) {
           ok: true,
           message: 'Dashboard loaded with default data',
           statistics: {
-            totalUsers: 0,
-            activeUsers: 0,
-            totalSericulturists: 0,
-            activeSericulturists: 0
+            total: 0,
+            active: 0,
+            inactive: 0
           }
         });
       } finally {
@@ -116,10 +116,10 @@ export default function Dashboard({ user, onLogout }) {
   };
 
   const activePercentage = Math.round(
-    (statistics?.activeUsers || 0) / (statistics?.totalUsers || 1) * 100
+    (statistics?.active || 0) / (statistics?.total || 1) * 100
   );
   const inactivePercentage = Math.round(
-    (statistics?.inactiveUsers || 0) / (statistics?.totalUsers || 1) * 100
+    (statistics?.inactive || 0) / (statistics?.total || 1) * 100
   );
 
   if (loading) {
@@ -313,7 +313,7 @@ export default function Dashboard({ user, onLogout }) {
               <StatCard
                 icon={<Users size={24} />}
                 title="Total Users"
-                value={statistics?.totalUsers || 0}
+                value={statistics?.total || 0}
                 subtitle="Registered users"
                 trend={
                   statistics?.recentGrowth != null || statistics?.newThisMonth != null
@@ -327,7 +327,7 @@ export default function Dashboard({ user, onLogout }) {
               <StatCard
                 icon={<UserCheck size={24} />}
                 title="Active Users"
-                value={statistics?.activeUsers || 0}
+                value={statistics?.active || 0}
                 subtitle={`${activePercentage}% of total`}
                 trend={`${activePercentage}% active`}
                 trendUp={activePercentage >= 50}
@@ -337,7 +337,7 @@ export default function Dashboard({ user, onLogout }) {
               <StatCard
                 icon={<UserX size={24} />}
                 title="Inactive Users"
-                value={statistics?.inactiveUsers || 0}
+                value={statistics?.inactive || 0}
                 subtitle="Need attention"
                 trend={`${inactivePercentage}% inactive`}
                 trendUp={false}

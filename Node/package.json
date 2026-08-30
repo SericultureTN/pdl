@@ -3,17 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "src/api/index.js",
+  "main": "src/index.js",
   "scripts": {
-    "dev": "node --watch src/index-sqlite.js",
-    "dev-postgres": "node scripts/check-postgres-env.js && node --watch src/index-postgres.js",
-    "dev-sqlite": "node --watch src/index-sqlite.js",
+    "dev": "node scripts/check-postgres-env.js && node --watch src/index.js",
+    "start": "node scripts/check-postgres-env.js && node src/index.js",
     "setup:env": "node scripts/setup-env.js",
-    "setup:postgres": "node scripts/check-postgres-env.js && node scripts/init-postgres-db.js",
-    "check:postgres": "node scripts/check-postgres-env.js",
-    "start": "node src/index-sqlite.js",
-    "start-postgres": "node scripts/check-postgres-env.js && node src/index-postgres.js",
-    "start-sqlite": "node src/index-sqlite.js",
+    "setup:db": "node scripts/check-postgres-env.js && node scripts/init-postgres-db.js",
     "build": "echo 'Build completed'"
   },
   "dependencies": {
@@ -22,14 +17,13 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
     "express": "^4.22.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
     "node-fetch": "^3.3.2",
     "pg": "^8.17.2",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.6",
     "xlsx": "^0.18.5"
   }
 }

@@ -1,281 +1,808 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { CheckCircle2, ChevronLeft, ChevronRight, Printer, Save } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Lock, Pencil, Plus, Printer, Trash2, X } from 'lucide-react';
+import clsx from 'clsx';
+import { authService } from '../../../services/auth.js';
+import RegionMarketOfficeSelect from '../../../components/RegionMarketOfficeSelect.jsx';
+import FiscalYearMonthPicker, {
+  getFyStart,
+  resolveMonthInFy,
+  currentFyStart,
+} from '../../../components/FiscalYearMonthPicker.jsx';
+import { getFinancialYearKey } from '../set-target/fiscalYear.js';
 import {
-  MIS34_SHARED_HEADER_SECTION,
-  MIS34_TAB_SECTIONS,
   MIS34_REPORT_TITLE,
   MIS34_FORM_CODE,
-} from './mis34FormSchema.js';
-import { MIS34_TAB_SCHEMAS, mis34HeaderSchema } from './mis34ZodSchema.js';
-import { loadMis34Draft, saveMis34Draft } from './mis34DefaultValues.js';
-import { applyMis34Calculations, applyMis34ComputedToForm } from './mis34Calculations.js';
-import { SchemaSectionRenderer, SharedHeaderRenderer } from '../government-reeling-unit/SchemaFormRenderer.jsx';
+  ACHIEVEMENT_TABLE_FIELDS,
+  PRODUCTION_FIELDS,
+  PRODUCTION_TABLE_FIELDS,
+  NSC_EXPENDITURE_TABLE_FIELDS,
+  COST_SALE_TABLE_FIELDS,
+  LIST_COLUMNS,
+  ABSTRACT_COLUMNS,
+} from './mis34Constants.js';
+import { createEmptyUnit, createMis34DefaultValues, saveMis34Draft, MIS34_STORAGE_KEY } from './mis34DefaultValues.js';
+import { computeUnitTotals, computeUnitTables, computeAbstract, computeProductionUm } from './mis34Calculations.js';
+import { mis34FormSchema, mis34HeaderSchema, validateUnit } from './mis34ZodSchema.js';
+import {
+  getPeriodKey,
+  isReportLocked,
+  loadMis34ReportForHeader,
+  saveMis34Report,
+  submitMis34ReportWithRollover,
+} from './mis34MonthRollover.js';
+import { getCurrentReport, saveReportDraft, submitReport } from './reportsApi.js';
 import GovernmentTwistingUnitPrintView from './GovernmentTwistingUnitPrintView.jsx';
 
-const TAB_IDS = ['tab1', 'tab2', 'tab3'];
-const STEP_REVIEW = 'review';
+function zodFieldErrors(error) {
+  if (!error?.issues) return {};
+  const map = {};
+  error.issues.forEach((issue) => {
+    map[issue.path[issue.path.length - 1]] = issue.message;
+  });
+  return map;
+}
 
-function ReviewSummary({ values }) {
-  const header = values.header || {};
-  const profitLoss = values.tab3?.profitLoss || {};
-
+function NumberField({ label, value, onChange, error, readOnly, computed }) {
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-emerald-primary/20 bg-emerald-muted p-4">
-        <h3 className="text-lg font-semibold text-emerald-secondary">Report Summary — MIS-34</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          {header.unitName || '—'} ({header.unitCode || '—'}) — {header.month || '—'} {header.year || '—'}
-        </p>
-        <p className="mt-1 text-xs text-slate-500">Unit type: twisting (shared reports/report_items schema)</p>
-      </div>
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+        {computed && <span className="ml-1 text-emerald-primary">(auto)</span>}
+      </span>
+      {readOnly || computed ? (
+        <input
+          type="text"
+          readOnly
+          value={value === '' || value == null ? '—' : value}
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+        />
+      ) : (
+        <input
+          type="number"
+          step="any"
+          min="0"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-emerald-primary/30"
+        />
+      )}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </label>
+  );
+}
 
-      {MIS34_TAB_SECTIONS.map((tab) => (
-        <div key={tab.id} className="rounded-xl border border-slate-200 bg-white p-4">
-          <h4 className="mb-3 font-semibold text-emerald-secondary">{tab.label}</h4>
-          <p className="text-sm text-slate-600">
-            {tab.sections.length} section(s). Calculated totals, machine stock closing, and profit/loss applied.
-          </p>
-        </div>
-      ))}
-
-      <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 max-w-md">
-        <p className="text-xs uppercase text-slate-500">Profit / Loss Result</p>
-        <p className="text-xl font-bold text-emerald-700">
-          {profitLoss.isProfit ? 'Profit' : 'Loss'}: Rs {Math.abs(Number(profitLoss.amount) || 0)}
-        </p>
+function FieldGroupCard({ title, fields, values, onChange, errors = {} }) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-900">{title}</h4>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {fields.map((field) => (
+          <NumberField
+            key={field.key}
+            label={field.label}
+            value={values?.[field.key]}
+            onChange={(val) => onChange(field.key, val)}
+            error={errors[field.key]}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
+const cell = (val) => (val === '' || val == null ? 0 : val);
+
+/**
+ * Generic U.L.M / D.M / U.M table — same styling used across Government Reeling
+ * Unit / Private Reeling. `rows` is a flat list of { key, label, ulm, dm, um,
+ * dmEditable, onDmChange, dmError, indent, emphasis }. Rows with dmEditable:false
+ * and no onDmChange render every column read-only (TOTAL / calculated rows).
+ */
+function DataTable({ title, rows }) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-900">{title}</h4>
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-emerald-muted">
+              <th className="border border-slate-200 px-3 py-2 text-left font-semibold text-slate-500">Field</th>
+              <th className="border border-slate-200 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">U.L.M</th>
+              <th className="border border-slate-200 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">D.M</th>
+              <th className="border border-slate-200 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">U.M</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className={row.emphasis ? 'bg-amber-50 font-semibold' : undefined}>
+                <td className={clsx('border border-slate-200 px-3 py-2 text-slate-700', row.indent && 'pl-6 font-normal')}>
+                  {row.label}
+                </td>
+                <td className="border border-slate-200 px-2 py-1">
+                  <input
+                    type="text"
+                    readOnly
+                    value={row.ulm === undefined ? '—' : cell(row.ulm)}
+                    className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right text-slate-600"
+                  />
+                </td>
+                <td className="border border-slate-200 px-2 py-1">
+                  {row.dmEditable ? (
+                    <>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={row.dm ?? ''}
+                        onChange={(e) => row.onDmChange(e.target.value)}
+                        className="w-full rounded border border-slate-300 px-2 py-1 text-right outline-none transition focus:ring-2 focus:ring-emerald-primary/30"
+                      />
+                      {row.dmError && <p className="text-[10px] text-red-600">{row.dmError}</p>}
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      readOnly
+                      value={cell(row.dm)}
+                      className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right text-slate-600"
+                    />
+                  )}
+                </td>
+                <td className="border border-slate-200 px-2 py-1">
+                  <input
+                    type="text"
+                    readOnly
+                    value={cell(row.um)}
+                    className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right text-slate-600"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function buildRows(fields, data, computedData, groupPath, onFieldChange, errors) {
+  return fields.map((f) => ({
+    key: f.key,
+    label: f.label,
+    ulm: data?.[f.ulmKey],
+    dm: data?.[f.dmKey],
+    um: computedData?.[f.umKey],
+    dmEditable: true,
+    onDmChange: (val) => onFieldChange(groupPath, f.dmKey, val),
+    dmError: errors[f.dmKey],
+  }));
+}
+
 export default function GovernmentTwistingUnitForm() {
-  const defaultValues = useMemo(() => loadMis34Draft(), []);
-  const [activeStep, setActiveStep] = useState('tab1');
-  const [savedTabs, setSavedTabs] = useState(defaultValues.meta?.savedTabs || []);
+  const initialDraft = useMemo(() => loadMis34ReportForHeader({}), []);
+  const [header, setHeader] = useState(initialDraft.header);
+  const [units, setUnits] = useState(initialDraft.units);
+  const [meta, setMeta] = useState(initialDraft.meta);
+
+  const [entryUnit, setEntryUnit] = useState(createEmptyUnit());
+  const [editingUnitId, setEditingUnitId] = useState(null);
+  const [entryErrors, setEntryErrors] = useState({});
+  const [headerErrors, setHeaderErrors] = useState({});
   const [message, setMessage] = useState('');
   const [showPrint, setShowPrint] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    setValue,
-    getValues,
-    trigger,
-    formState: { errors },
-  } = useForm({ defaultValues, mode: 'onBlur' });
+  const [currentUserRole, setCurrentUserRole] = useState(null);
+  const [ownOfficeId, setOwnOfficeId] = useState(null);
+  const [ownRegionId, setOwnRegionId] = useState(null);
+  const [browseFyStart, setBrowseFyStart] = useState(currentFyStart);
 
-  const watchedValues = useWatch({ control });
+  const isLocked = isReportLocked(meta);
+  const isOfficeLockedForRole = currentUserRole === 'user';
+
+  const activePeriodRef = useRef(getPeriodKey(header));
+  const skipPeriodSwitchRef = useRef(true);
 
   useEffect(() => {
-    if (!watchedValues || Object.keys(watchedValues).length === 0) return;
-    applyMis34ComputedToForm(watchedValues, setValue);
-  }, [watchedValues, setValue]);
+    authService.getCurrentUser()
+      .then((result) => {
+        const user = result?.user;
+        setCurrentUserRole(user?.role || null);
+        if (user?.role === 'user') {
+          setOwnOfficeId(user.office_id ?? null);
+          setOwnRegionId(user.group_id ?? null);
+        }
+      })
+      .catch(() => setCurrentUserRole(null));
+  }, []);
 
-  const currentTab = MIS34_TAB_SECTIONS.find((tab) => tab.id === activeStep);
+  useEffect(() => {
+    if (currentUserRole !== 'user' || !ownOfficeId || !ownRegionId) return;
+    if (header.marketOfficeId === ownOfficeId) return;
+    setHeader((prev) => ({ ...prev, regionId: ownRegionId, marketOfficeId: ownOfficeId }));
+  }, [currentUserRole, ownOfficeId, ownRegionId, header.marketOfficeId]);
 
-  const persistDraft = (nextSavedTabs, status = 'draft') => {
-    saveMis34Draft({
-      ...getValues(),
-      meta: { savedTabs: nextSavedTabs, status, unitType: 'twisting' },
-    });
+  // Switching Region/Office/Month/Year loads that period's report — server-synced
+  // first, then U.L.M-carried-forward local draft — same pattern as the other 2 forms.
+  useEffect(() => {
+    if (!header.marketOfficeId || !header.month || !header.year) return;
+    const nextKey = getPeriodKey(header);
+    if (!nextKey) return;
+
+    if (skipPeriodSwitchRef.current) {
+      skipPeriodSwitchRef.current = false;
+      activePeriodRef.current = nextKey;
+      return;
+    }
+    if (nextKey === activePeriodRef.current) return;
+
+    const outgoingKey = activePeriodRef.current;
+    if (outgoingKey) {
+      saveMis34Report(outgoingKey, { header, units, meta });
+    }
+    activePeriodRef.current = nextKey;
+
+    let cancelled = false;
+    (async () => {
+      const fiscalYear = getFinancialYearKey(header.month, header.year);
+      try {
+        const remote = fiscalYear
+          ? await getCurrentReport({ officeId: header.marketOfficeId, fiscalYear, month: header.month })
+          : null;
+        if (remote?.data && Object.keys(remote.data).length > 0) {
+          saveMis34Report(nextKey, remote.data);
+        }
+      } catch (error) {
+        console.error('Failed to sync current-period twisting report from server:', error);
+      }
+      if (cancelled) return;
+      const loaded = loadMis34ReportForHeader(header);
+      setHeader(loaded.header);
+      setUnits(loaded.units);
+      setMeta(loaded.meta);
+      setMessage(
+        loaded.meta?.ulmCarriedFrom
+          ? `U.L.M values carried from ${loaded.meta.ulmCarriedFrom.replace(/\|/g, ' / ')}.`
+          : ''
+      );
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [header.marketOfficeId, header.month, header.year]);
+
+  const selectionFyStart = header.month && header.year ? getFyStart(header.month, header.year) : null;
+  const fyStart = selectionFyStart ?? browseFyStart;
+
+  const handleFyStartChange = (nextFyStart) => {
+    if (header.month && header.year) {
+      const shifted = resolveMonthInFy(header.month, nextFyStart);
+      if (shifted) setHeader((prev) => ({ ...prev, month: shifted.month, year: String(shifted.year) }));
+    } else {
+      setBrowseFyStart(nextFyStart);
+    }
   };
 
-  const validateStep = async (stepId) => {
-    if (stepId === STEP_REVIEW) return true;
+  const handleHeaderField = (key, value) => setHeader((prev) => ({ ...prev, [key]: value }));
 
-    const headerOk = await trigger('header');
-    if (!headerOk) {
-      setMessage('Please complete the shared header before continuing.');
+  const handleEntryTopField = (key, value) => setEntryUnit((prev) => ({ ...prev, [key]: value }));
+  const handleProductionField = (key, value) =>
+    setEntryUnit((prev) => ({ ...prev, productionDetails: { ...prev.productionDetails, [key]: value } }));
+  const handleTableFieldChange = (groupPath, dmKey, value) =>
+    setEntryUnit((prev) => ({ ...prev, [groupPath]: { ...prev[groupPath], [dmKey]: value } }));
+
+  const computed = computeUnitTotals(entryUnit);
+  const tables = computeUnitTables(entryUnit);
+  const computedProduction = computeProductionUm(entryUnit.productionDetails);
+
+  const achievementGroups = useMemo(() => {
+    const byGroup = new Map();
+    ACHIEVEMENT_TABLE_FIELDS.forEach((f) => {
+      if (!byGroup.has(f.group)) byGroup.set(f.group, []);
+      byGroup.get(f.group).push(f);
+    });
+    return Array.from(byGroup.entries());
+  }, []);
+
+  const nscRows = [
+    ...buildRows(NSC_EXPENDITURE_TABLE_FIELDS, entryUnit.nscExpenditure, tables.nscExpenditure, 'nscExpenditure', handleTableFieldChange, entryErrors),
+    {
+      key: 'nscTotal',
+      label: 'TOTAL',
+      ulm: computed.nscTotal.ulm,
+      dm: computed.nscTotal.dm,
+      um: computed.nscTotal.um,
+      dmEditable: false,
+      emphasis: true,
+    },
+  ];
+
+  const costSaleRows = [
+    ...buildRows(COST_SALE_TABLE_FIELDS, entryUnit.costSaleValue, tables.costSaleValue, 'costSaleValue', handleTableFieldChange, entryErrors),
+    {
+      key: 'netExpenditure',
+      label: 'Net Expenditure (Rs)',
+      ulm: undefined,
+      dm: computed.netExpenditure.dm,
+      um: computed.netExpenditure.um,
+      dmEditable: false,
+      emphasis: true,
+    },
+    {
+      key: 'costOfProductionPerKg',
+      label: 'Cost of Production per Kg (Rs)',
+      ulm: undefined,
+      dm: computed.costOfProductionPerKg.dm === '' ? '—' : computed.costOfProductionPerKg.dm,
+      um: computed.costOfProductionPerKg.um === '' ? '—' : computed.costOfProductionPerKg.um,
+      dmEditable: false,
+      emphasis: true,
+    },
+  ];
+
+  const persistLocalDraft = (nextUnits, nextMeta, nextHeader = header) => {
+    saveMis34Draft({ header: nextHeader, units: nextUnits, meta: nextMeta });
+    const periodKey = getPeriodKey(nextHeader);
+    if (periodKey && !isReportLocked(nextMeta)) {
+      saveMis34Report(periodKey, { header: nextHeader, units: nextUnits, meta: nextMeta });
+    }
+  };
+
+  const handleSaveUnit = () => {
+    const result = validateUnit(entryUnit);
+    if (!result.success) {
+      setEntryErrors(zodFieldErrors(result.error));
+      setMessage('Fix validation errors before saving this unit.');
+      return;
+    }
+    setEntryErrors({});
+
+    const nextUnits = editingUnitId
+      ? units.map((u) => (u.id === editingUnitId ? entryUnit : u))
+      : [...units, entryUnit];
+
+    setUnits(nextUnits);
+    persistLocalDraft(nextUnits, meta);
+    setEntryUnit(createEmptyUnit());
+    setEditingUnitId(null);
+    setMessage(editingUnitId ? 'Unit updated.' : 'Unit added to the list.');
+  };
+
+  const handleEditUnit = (id) => {
+    const unit = units.find((u) => u.id === id);
+    if (!unit) return;
+    setEntryUnit(unit);
+    setEditingUnitId(id);
+    setMessage(`Editing ${unit.unitName || 'unit'} — save or cancel below.`);
+  };
+
+  const handleCancelEdit = () => {
+    setEntryUnit(createEmptyUnit());
+    setEditingUnitId(null);
+    setEntryErrors({});
+  };
+
+  const handleDeleteUnit = (id) => {
+    const nextUnits = units.filter((u) => u.id !== id);
+    setUnits(nextUnits);
+    persistLocalDraft(nextUnits, meta);
+    if (editingUnitId === id) handleCancelEdit();
+  };
+
+  const validateHeader = () => {
+    const result = mis34HeaderSchema.safeParse(header);
+    if (!result.success) {
+      setHeaderErrors(zodFieldErrors(result.error));
       return false;
     }
-
-    const headerResult = mis34HeaderSchema.safeParse(getValues().header);
-    if (!headerResult.success) {
-      setMessage('Please complete the shared header before continuing.');
-      return false;
-    }
-
-    const schema = MIS34_TAB_SCHEMAS[stepId];
-    if (!schema) return true;
-
-    const tabResult = schema.safeParse(getValues()[stepId]);
-    if (!tabResult.success) {
-      await trigger(stepId);
-      setMessage('Please fix validation errors on this tab before saving.');
-      return false;
-    }
-
-    setMessage('');
+    setHeaderErrors({});
     return true;
   };
 
-  const handleSaveAndContinue = async () => {
-    const ok = await validateStep(activeStep);
-    if (!ok) return;
+  const persistToServer = async (targetHeader, targetUnits, nextMeta) => {
+    const fiscalYear = getFinancialYearKey(targetHeader.month, targetHeader.year);
+    const saved = await saveReportDraft({
+      officeId: targetHeader.marketOfficeId,
+      fiscalYear,
+      month: targetHeader.month,
+      data: { header: targetHeader, units: targetUnits, meta: nextMeta },
+    });
+    return saved;
+  };
 
-    const nextSaved = savedTabs.includes(activeStep) ? savedTabs : [...savedTabs, activeStep];
-    setSavedTabs(nextSaved);
-    persistDraft(nextSaved);
-    setMessage('Tab saved successfully.');
+  const handleSaveReport = async () => {
+    if (isLocked) {
+      setMessage('This report is submitted and locked.');
+      return;
+    }
+    if (!validateHeader()) {
+      setMessage('Complete the shared header (Region, Market Office, Month, Year) before saving.');
+      return;
+    }
+    if (units.length === 0) {
+      setMessage('Add at least one twisting unit before saving.');
+      return;
+    }
 
-    const currentIndex = TAB_IDS.indexOf(activeStep);
-    if (currentIndex < TAB_IDS.length - 1) {
-      setActiveStep(TAB_IDS[currentIndex + 1]);
-    } else {
-      setActiveStep(STEP_REVIEW);
+    setSaving(true);
+    try {
+      await persistToServer(header, units, meta);
+      persistLocalDraft(units, meta);
+      setMessage('Report saved as draft.');
+    } catch (error) {
+      console.error('Failed to save twisting report:', error);
+      setMessage('Saved locally, but syncing to the server failed — check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleFinalSubmit = handleSubmit(async () => {
-    const allSaved = TAB_IDS.every((id) => savedTabs.includes(id));
-    if (!allSaved) {
-      setMessage('Save all three tabs before final submission.');
+  const handleSubmitReport = async () => {
+    if (isLocked) {
+      setMessage('This report is submitted and locked.');
+      return;
+    }
+    if (!validateHeader()) {
+      setMessage('Complete the shared header before submitting.');
       return;
     }
 
-    const headerOk = await trigger('header');
-    const tab1Ok = await trigger('tab1');
-    const tab2Ok = await trigger('tab2');
-    const tab3Ok = await trigger('tab3');
-    if (!headerOk || !tab1Ok || !tab2Ok || !tab3Ok) {
-      setMessage('Please resolve all validation errors before submitting.');
+    const formResult = mis34FormSchema.safeParse({ header, units });
+    if (!formResult.success) {
+      setMessage('Resolve all validation errors before submitting — check each unit and add at least one.');
       return;
     }
 
-    persistDraft(savedTabs, 'submitted');
-    setSubmitted(true);
-    setMessage('MIS-34 twisting unit report submitted successfully.');
-  });
+    let submittedBy = 'unknown';
+    try {
+      const user = await authService.getCurrentUser();
+      submittedBy = user?.user?.email || user?.user?.username || 'unknown';
+    } catch {
+      /* session unavailable in POC */
+    }
+
+    const result = submitMis34ReportWithRollover({ header, units, meta }, submittedBy);
+    if (!result.ok) {
+      setMessage(result.error);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const saved = await persistToServer(result.submittedReport.header, result.submittedReport.units, result.submittedReport.meta);
+      await submitReport(saved.id);
+
+      if (result.nextDraft) {
+        await persistToServer(result.nextDraft.header, result.nextDraft.units, result.nextDraft.meta);
+      }
+
+      // Move straight to next month's (carried U.L.M, blank D.M) draft rather
+      // than leaving this month's just-submitted values on screen.
+      const freshDraft = result.nextDraft || {
+        ...createMis34DefaultValues(),
+        header: { ...createMis34DefaultValues().header, adCode: result.submittedReport.header.adCode, disCode: result.submittedReport.header.disCode, regCode: result.submittedReport.header.regCode, regionId: result.submittedReport.header.regionId, marketOfficeId: result.submittedReport.header.marketOfficeId },
+      };
+      skipPeriodSwitchRef.current = true;
+      setHeader(freshDraft.header);
+      setUnits(freshDraft.units);
+      setMeta(freshDraft.meta);
+      setEntryUnit(createEmptyUnit());
+      setEditingUnitId(null);
+      localStorage.setItem(MIS34_STORAGE_KEY, JSON.stringify(freshDraft));
+      activePeriodRef.current = getPeriodKey(freshDraft.header);
+
+      const nextLabel = result.nextHeader ? `${result.nextHeader.month} ${result.nextHeader.year}` : null;
+      setMessage(
+        nextLabel
+          ? `Report submitted and locked. Now showing the ${nextLabel} draft, with U.L.M carried forward from this month's U.M values.`
+          : 'Report submitted and locked.'
+      );
+    } catch (error) {
+      console.error('Failed to submit twisting report:', error);
+      setMessage('Submission failed to sync to the server. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (showPrint) {
     return (
       <GovernmentTwistingUnitPrintView
-        values={applyMis34Calculations(getValues())}
+        header={header}
+        units={units}
         onClose={() => setShowPrint(false)}
       />
     );
   }
 
+  const abstractRows = computeAbstract(units);
+
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4 md:p-6">
-      <form onSubmit={handleFinalSubmit} className="space-y-4">
-        <SharedHeaderRenderer
-          section={MIS34_SHARED_HEADER_SECTION}
-          register={register}
-          errors={errors}
-          reportTitle={MIS34_REPORT_TITLE}
-          formCode={MIS34_FORM_CODE}
-        />
-
-        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-          {MIS34_TAB_SECTIONS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveStep(tab.id)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                activeStep === tab.id
-                  ? 'bg-emerald-primary text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {tab.label}
-              {savedTabs.includes(tab.id) && (
-                <CheckCircle2 className="ml-1 inline-block h-4 w-4 text-emerald-300" />
-              )}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setActiveStep(STEP_REVIEW)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              activeStep === STEP_REVIEW
-                ? 'bg-emerald-primary text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            Review & Submit
-          </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-emerald-secondary">{MIS34_REPORT_TITLE}</h1>
+          <p className="text-sm text-slate-500">{MIS34_FORM_CODE} — Register-based data entry</p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowPrint(true)}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Printer className="h-4 w-4" /> Print / Export
+        </button>
+      </div>
 
-        {message && (
-          <div className={`rounded-lg px-4 py-3 text-sm ${submitted ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>
-            {message}
-          </div>
-        )}
+      <div className="sticky top-0 z-10 rounded-xl border border-emerald-primary/20 bg-white/95 p-4 shadow-md backdrop-blur">
+        <h2 className="mb-3 text-base font-semibold text-emerald-secondary">Unit &amp; Period Details</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">AD Code</span>
+            <input
+              type="text"
+              value={header.adCode || ''}
+              onChange={(e) => handleHeaderField('adCode', e.target.value)}
+              disabled={isLocked}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">DIS Code</span>
+            <input
+              type="text"
+              value={header.disCode || ''}
+              onChange={(e) => handleHeaderField('disCode', e.target.value)}
+              disabled={isLocked}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">REG Code</span>
+            <input
+              type="text"
+              value={header.regCode || ''}
+              onChange={(e) => handleHeaderField('regCode', e.target.value)}
+              disabled={isLocked}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+            />
+          </label>
+        </div>
+        <div className="mt-4 max-w-sm">
+          <FiscalYearMonthPicker
+            label="Report Period *"
+            fyStart={fyStart}
+            onFyStartChange={handleFyStartChange}
+            selectedMonth={header.month}
+            selectedYear={header.year}
+            onSelectMonth={({ month, year }) => setHeader((prev) => ({ ...prev, month, year: String(year) }))}
+            disabled={isLocked}
+          />
+          {headerErrors.month && <p className="mt-1 text-xs text-red-600">{headerErrors.month}</p>}
+        </div>
+        <div className="mt-4">
+          <RegionMarketOfficeSelect
+            regionId={header.regionId || null}
+            marketOfficeId={header.marketOfficeId || null}
+            onChange={({ regionId, marketOfficeId }) =>
+              setHeader((prev) => ({ ...prev, regionId: regionId ?? '', marketOfficeId: marketOfficeId ?? '' }))
+            }
+            disabled={isLocked || isOfficeLockedForRole}
+            required
+          />
+          {(headerErrors.regionId || headerErrors.marketOfficeId) && (
+            <p className="mt-1 text-xs text-red-600">{headerErrors.regionId || headerErrors.marketOfficeId}</p>
+          )}
+        </div>
+      </div>
 
-        {activeStep === STEP_REVIEW ? (
-          <ReviewSummary values={getValues()} />
-        ) : (
-          <div className="space-y-4">
-            {currentTab?.sections.map((section) => (
-              <SchemaSectionRenderer
-                key={section.id}
-                section={section}
-                register={register}
-                errors={errors}
-                watch={() => getValues()}
-              />
-            ))}
-          </div>
-        )}
+      {message && (
+        <div className={clsx('rounded-lg px-4 py-3 text-sm', isLocked ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800')}>
+          {message}
+        </div>
+      )}
 
-        <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const idx = activeStep === STEP_REVIEW ? TAB_IDS.length : TAB_IDS.indexOf(activeStep);
-                if (idx > 0) setActiveStep(TAB_IDS[idx - 1]);
-              }}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <ChevronLeft className="h-4 w-4" /> Previous
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const idx = TAB_IDS.indexOf(activeStep);
-                if (idx >= 0 && idx < TAB_IDS.length - 1) setActiveStep(TAB_IDS[idx + 1]);
-                if (activeStep === TAB_IDS[TAB_IDS.length - 1]) setActiveStep(STEP_REVIEW);
-              }}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+      {isLocked && (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>
+            Submitted report — locked
+            {meta.submittedAt ? ` on ${new Date(meta.submittedAt).toLocaleString()}` : ''}
+            {meta.submittedBy ? ` by ${meta.submittedBy}` : ''}.
+          </span>
+        </div>
+      )}
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setShowPrint(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Printer className="h-4 w-4" /> Print / Export
-            </button>
-
-            {activeStep !== STEP_REVIEW ? (
+      {!isLocked && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-emerald-secondary">
+              {editingUnitId ? 'Edit Twisting Unit' : 'Add a Twisting Unit'}
+            </h3>
+            {editingUnitId && (
               <button
                 type="button"
-                onClick={handleSaveAndContinue}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-light"
+                onClick={handleCancelEdit}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
               >
-                <Save className="h-4 w-4" /> Save &amp; Continue
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-light"
-              >
-                <CheckCircle2 className="h-4 w-4" /> Submit Report
+                <X className="h-3.5 w-3.5" /> Cancel edit
               </button>
             )}
           </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Unit Name</span>
+              <input
+                type="text"
+                value={entryUnit.unitName}
+                onChange={(e) => handleEntryTopField('unitName', e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+              {entryErrors.unitName && <p className="mt-1 text-xs text-red-600">{entryErrors.unitName}</p>}
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Unit Code</span>
+              <input
+                type="text"
+                value={entryUnit.unitCode}
+                onChange={(e) => handleEntryTopField('unitCode', e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {achievementGroups.map(([groupName, groupFields]) => (
+              <DataTable
+                key={groupName}
+                title={`Achievement to Target — ${groupName}`}
+                rows={buildRows(groupFields, entryUnit.achievementToTarget, tables.achievementToTarget, 'achievementToTarget', handleTableFieldChange, entryErrors)}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4">
+            <FieldGroupCard
+              title="Production Capacity"
+              fields={PRODUCTION_FIELDS}
+              values={entryUnit.productionDetails}
+              onChange={handleProductionField}
+              errors={entryErrors}
+            />
+          </div>
+
+          <div className="mt-4">
+            <DataTable
+              title="Production Details"
+              rows={buildRows(PRODUCTION_TABLE_FIELDS, entryUnit.productionDetails, computedProduction, 'productionDetails', handleTableFieldChange, entryErrors)}
+            />
+          </div>
+
+          <div className="mt-4">
+            <DataTable title="NSC Expenditure" rows={nscRows} />
+          </div>
+
+          <div className="mt-4">
+            <DataTable title="Cost & Sale Value" rows={costSaleRows} />
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSaveUnit}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-light"
+            >
+              <Plus className="h-4 w-4" /> {editingUnitId ? 'Save changes' : 'Save twisting unit'}
+            </button>
+          </div>
         </div>
-      </form>
+      )}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-3 text-base font-semibold text-emerald-secondary">Saved Twisting Units ({units.length})</h3>
+        {units.length === 0 ? (
+          <p className="text-sm text-slate-500">No units added yet — use the form above to add one.</p>
+        ) : (
+          <div className="overflow-auto rounded-lg border border-slate-200">
+            <table className="min-w-full border-collapse text-sm">
+              <thead className="bg-emerald-muted">
+                <tr>
+                  {LIST_COLUMNS.map((col) => (
+                    <th key={col.id} className="border border-slate-200 px-3 py-2 text-left font-semibold text-emerald-secondary">
+                      {col.label}
+                    </th>
+                  ))}
+                  {!isLocked && <th className="border border-slate-200 px-3 py-2" />}
+                </tr>
+              </thead>
+              <tbody>
+                {units.map((unit) => {
+                  const totals = computeUnitTotals(unit);
+                  const production = computeProductionUm(unit.productionDetails || {});
+                  return (
+                    <tr key={unit.id} className="hover:bg-slate-50/80">
+                      <td className="border border-slate-100 px-3 py-2">{unit.unitName || '(unnamed unit)'}</td>
+                      <td className="border border-slate-100 px-3 py-2 text-right">{production.productionOfTwistedRawSilkDm || '—'}</td>
+                      <td className="border border-slate-100 px-3 py-2 text-right">{totals.nscTotal.dm || '—'}</td>
+                      <td className="border border-slate-100 px-3 py-2 text-right">{totals.costOfProductionPerKg.dm || '—'}</td>
+                      {!isLocked && (
+                        <td className="border border-slate-100 px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleEditUnit(unit.id)}
+                              className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                              title="Edit unit"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUnit(unit.id)}
+                              className="rounded p-1 text-red-500 hover:bg-red-50"
+                              title="Delete unit"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-1 text-base font-semibold text-emerald-secondary">Abstract</h3>
+        <p className="mb-3 text-xs text-slate-500">Auto-computed from the units above — never entered directly.</p>
+        <div className="overflow-auto rounded-lg border border-slate-200">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="bg-emerald-muted">
+              <tr>
+                {ABSTRACT_COLUMNS.map((col) => (
+                  <th key={col.id} className="border border-slate-200 px-3 py-2 text-left font-semibold text-emerald-secondary">
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {abstractRows.map((row) => (
+                <tr key={row.key} className={row.isGrandTotal ? 'bg-amber-50 font-semibold' : 'hover:bg-slate-50'}>
+                  {ABSTRACT_COLUMNS.map((col) => (
+                    <td key={col.id} className={clsx('border border-slate-100 px-3 py-2', col.id !== 'unitName' && 'text-right')}>
+                      {row[col.id] === '' || row[col.id] == null ? '—' : row[col.id]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {!isLocked && (
+        <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+          <button
+            type="button"
+            onClick={handleSaveReport}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Save as Draft
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmitReport}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-light disabled:opacity-50"
+          >
+            <CheckCircle2 className="h-4 w-4" /> Submit Report
+          </button>
+        </div>
+      )}
     </div>
   );
 }

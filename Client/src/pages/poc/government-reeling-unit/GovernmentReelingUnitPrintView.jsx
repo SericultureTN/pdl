@@ -49,6 +49,44 @@ function renderSection(section, values) {
     );
   }
 
+  if (section.type === 'productionDetailsCard') {
+    return (
+      <div key={section.id} className="mb-6 break-inside-avoid">
+        <h3 className="mb-2 border-b border-slate-400 pb-1 text-sm font-bold uppercase">{section.title}</h3>
+        <table className="mb-3 w-full border-collapse text-xs">
+          <tbody>
+            {(section.fields || []).map((f) => (
+              <tr key={f.key}>
+                <td className="border border-slate-300 bg-slate-100 px-2 py-1 font-medium">{f.label}</td>
+                <td className="border border-slate-300 px-2 py-1">{data[f.key] ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className="border border-slate-400 bg-slate-100 px-2 py-1 text-left">Particulars</th>
+              {(section.columns || []).map((c) => (
+                <th key={c.key} className="border border-slate-400 bg-slate-100 px-2 py-1 text-left">{c.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(section.rows || []).map((row) => (
+              <tr key={row.key}>
+                <td className="border border-slate-300 px-2 py-1">{row.label}</td>
+                {(section.columns || []).map((col) => (
+                  <td key={col.key} className="border border-slate-300 px-2 py-1">{data[row.key]?.[col.key] ?? '—'}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   if (section.type === 'timePeriodMatrix') {
     return (
       <PrintTable
@@ -65,23 +103,16 @@ function renderSection(section, values) {
   }
 
   if (section.type === 'financialBudget') {
-    const rows = [];
-    (section.rows || []).forEach((row) => {
-      section.categoryTypes.forEach((type) => {
-        rows.push([
-          row.label,
-          type.label,
-          ...(section.columns || []).map((col) => data[row.key]?.[type.key]?.[col.key] ?? '—'),
-        ]);
-      });
-    });
     return (
       <PrintTable
         key={section.id}
         title={section.title}
-        note="Budget U.M = Budget U.L.M + Budget D.M; Actual Annual = Budget Annual − Budget U.M"
-        headers={['Category', 'Type', ...(section.columns || []).map((c) => c.label)]}
-        rows={rows}
+        note="Outlay is the full yearly figure, unchanged every month; Variance = Outlay − Expenses"
+        headers={['Category', ...(section.columns || []).map((c) => c.label)]}
+        rows={(section.rows || []).map((row) => [
+          row.label,
+          ...(section.columns || []).map((col) => data[row.key]?.[col.key] ?? '—'),
+        ])}
       />
     );
   }
@@ -91,7 +122,7 @@ function renderSection(section, values) {
       <PrintTable
         key={section.id}
         title={section.title}
-        note="Closing Balance = Opening + Added − Under Process"
+        note="Total = Opening + Added; Closing Balance = Total − Cocoon Consumed / Silk Produced / Sold / Disposed"
         headers={['Item', ...(section.columns || []).map((c) => c.label)]}
         rows={(section.items || []).map((item) => [
           item.label,
@@ -102,61 +133,15 @@ function renderSection(section, values) {
   }
 
   if (section.type === 'receiptsTimePeriod') {
-    const subCols = [
-      { key: 'valueRs', label: 'Value (Rs)' },
-      { key: 'cash', label: 'Cash' },
-    ];
-    const headers = ['Particulars'];
-    subCols.forEach((sub) => {
-      (section.columns || []).forEach((col) => {
-        headers.push(`${sub.label} ${col.label}`);
-      });
-    });
-    const rows = (section.items || []).map((item) => {
-      const cells = [item.label];
-      subCols.forEach((sub) => {
-        (section.columns || []).forEach((col) => {
-          cells.push(data[item.key]?.[sub.key]?.[col.key] ?? '—');
-        });
-      });
-      return cells;
-    });
     return (
       <PrintTable
         key={section.id}
         title={section.title}
-        headers={headers}
-        rows={rows}
-      />
-    );
-  }
-
-  if (section.type === 'silkSalesTimePeriod') {
-    const subCols = [
-      { key: 'qty', label: 'Qty (Kgs)' },
-      { key: 'value', label: 'Value (Rs)' },
-    ];
-    const headers = ['Particulars'];
-    subCols.forEach((sub) => {
-      (section.columns || []).forEach((col) => {
-        headers.push(`${sub.label} ${col.label}`);
-      });
-    });
-    const rows = (section.rows || []).map((row) => {
-      const cells = [row.label];
-      subCols.forEach((sub) => {
-        (section.columns || []).forEach((col) => {
-          cells.push(data[row.key]?.[sub.key]?.[col.key] ?? '—');
-        });
-      });
-      return cells;
-    });
-    return (
-      <PrintTable
-        key={section.id}
-        title={section.title}
-        headers={headers}
-        rows={rows}
+        headers={['Particulars', ...(section.columns || []).map((c) => c.label)]}
+        rows={(section.items || []).map((item) => [
+          item.label,
+          ...(section.columns || []).map((col) => data[item.key]?.valueRs?.[col.key] ?? '—'),
+        ])}
       />
     );
   }
@@ -209,11 +194,10 @@ function renderSection(section, values) {
       <PrintTable
         key={section.id}
         title={section.title}
-        note="Enter D.M manually. U.L.M carried on submit. U.M = U.L.M + D.M (cumulative index)."
-        headers={['Particulars','U.L.M', 'D.M', 'U.M']}
+        note="Rates, not accumulating totals — no U.L.M column. Manual rows: U.M mirrors D.M. Others are auto-derived from other sections."
+        headers={['Particulars', 'D.M', 'U.M']}
         rows={(section.fields || []).map((field) => [
           field.label,
-          data[field.key]?.ulm ?? '—',
           data[field.key]?.dm ?? '—',
           data[field.key]?.um ?? '—',
         ])}
@@ -275,7 +259,7 @@ function renderSection(section, values) {
   );
 }
 
-export default function GovernmentReelingUnitPrintView({ values, onClose }) {
+export default function GovernmentReelingUnitPrintView({ values, onClose, hideActions = false }) {
   const header = values.header || {};
 
   const handlePrint = () => {
@@ -284,22 +268,24 @@ export default function GovernmentReelingUnitPrintView({ values, onClose }) {
 
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-6">
-      <div className="mb-4 flex gap-2 print:hidden">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
-        >
-          Back to Form
-        </button>
-        <button
-          type="button"
-          onClick={handlePrint}
-          className="rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white"
-        >
-          Print Report
-        </button>
-      </div>
+      {!hideActions && (
+        <div className="mb-4 flex gap-2 print:hidden">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+          >
+            Back to Form
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white"
+          >
+            Print Report
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-300 bg-white p-6 print:border-0 print:p-0">
         <div className="mb-6 text-center">

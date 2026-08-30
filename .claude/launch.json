@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "node-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Node", "run", "dev"],
+      "port": 4000
+    }
+  ]
+}

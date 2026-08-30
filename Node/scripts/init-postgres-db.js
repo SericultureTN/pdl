@@ -75,7 +75,7 @@ async function main() {
     }
 
     console.log('\nNext step:');
-    console.log('  npm run dev-postgres');
+    console.log('  npm run dev');
   } catch (error) {
     console.error('\n❌ Database setup failed:', error.message);
     if (error.message.includes('password authentication failed')) {

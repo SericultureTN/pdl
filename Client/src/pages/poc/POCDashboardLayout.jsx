@@ -5,7 +5,7 @@ import POCHeader from './POCHeader.jsx';
 import { getPocRouteMeta } from './pocNavConfig.js';
 import '../mispage.css';
 
-export default function POCDashboardLayout({ onLogout }) {
+export default function POCDashboardLayout({ user, onLogout }) {
   const location = useLocation();
   const { title, breadcrumb } = getPocRouteMeta(location.pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +33,7 @@ export default function POCDashboardLayout({ onLogout }) {
         <POCHeader
           title={title}
           breadcrumb={breadcrumb}
+          user={user}
           onMenuClick={() => setSidebarOpen(true)}
         />
         <div className="mis-portal-content">

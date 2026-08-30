@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Users, UserCheck, UserX, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { sericulturistService } from '../services/sericulturist.js';
+import { userService } from '../services/user.js';
 import UserForm from './UserForm.jsx';
 import './UserList.css';
 
@@ -26,7 +26,7 @@ export default function UserList() {
     try {
       setLoading(true);
       setError('');
-      const result = await sericulturistService.getAll(
+      const result = await userService.getAll(
         pagination.current,
         pagination.limit,
         searchTerm,
@@ -34,7 +34,7 @@ export default function UserList() {
       );
 
       if (result.ok) {
-        setUsers(result.sericulturists || []);
+        setUsers(result.users || []);
         setPagination(result.pagination);
       } else {
         setError(result.error || 'Failed to load users');
@@ -70,7 +70,7 @@ export default function UserList() {
     }
 
     try {
-      await sericulturistService.delete(user.id);
+      await userService.delete(user.id);
       fetchUsers();
     } catch (err) {
       setError(err.message);
@@ -107,7 +107,7 @@ export default function UserList() {
     }
 
     try {
-      await sericulturistService.bulkUpdateStatus(selectedUsers, status);
+      await userService.bulkUpdateStatus(selectedUsers, status);
       setSelectedUsers([]);
       fetchUsers();
     } catch (err) {
@@ -123,7 +123,7 @@ export default function UserList() {
     }
 
     try {
-      await sericulturistService.bulkDelete(selectedUsers);
+      await userService.bulkDelete(selectedUsers);
       setSelectedUsers([]);
       fetchUsers();
     } catch (err) {
@@ -134,6 +134,9 @@ export default function UserList() {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString();
   };
+
+  const ROLE_LABELS = { admin: 'Admin', secondary_admin: 'Secondary Admin', user: 'User' };
+  const formatRole = (role) => ROLE_LABELS[role] || role || '-';
 
   const getStatusBadge = (status) => {
     return (
@@ -159,7 +162,7 @@ export default function UserList() {
         <div className="user-list-header-left">
           <h2>
             <Users size={24} />
-            Sericulturists
+            Users
           </h2>
           <span className="user-count">
             {pagination.totalItems} total users
@@ -247,6 +250,7 @@ export default function UserList() {
               <th>Phone</th>
               <th>Role</th>
               <th>Section</th>
+              <th>Office</th>
               <th>Status</th>
               <th>Joined</th>
               <th>Actions</th>
@@ -272,8 +276,9 @@ export default function UserList() {
                 </td>
                 <td>{user.email}</td>
                 <td>{user.phone || '-'}</td>
-                <td>{user.role || '-'}</td>
-                <td>{user.ad_office || '-'}</td>
+                <td>{formatRole(user.role)}</td>
+                <td>{user.section_name || '-'}</td>
+                <td>{user.office_name || '-'}</td>
                 <td>{getStatusBadge(user.status)}</td>
                 <td>{formatDate(user.created_at)}</td>
                 <td>
@@ -304,7 +309,7 @@ export default function UserList() {
         <div className="empty-state">
           <Users size={48} />
           <h3>No users found</h3>
-          <p>Get started by adding your first sericulturist.</p>
+          <p>Get started by adding your first user.</p>
           <button onClick={handleCreateUser} className="btn btn-primary">
             <Plus size={16} />
             Add First User

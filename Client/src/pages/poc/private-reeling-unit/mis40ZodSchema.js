@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KG_FIELD_GROUPS } from './mis40Constants.js';
 
 const nonNegativeNumber = z
   .union([z.string(), z.number()])
@@ -8,34 +9,35 @@ const nonNegativeNumber = z
     { message: 'Must be a non-negative number' }
   );
 
+const kgFieldShape = Object.fromEntries(
+  KG_FIELD_GROUPS.flatMap(({ ulmKey, dmKey, umKey }) => [
+    [ulmKey, nonNegativeNumber],
+    [dmKey, nonNegativeNumber],
+    [umKey, z.any().optional()], // always derived (ulm + dm), never entered directly
+  ])
+);
+
 export const mis40RowSchema = z.object({
   id: z.string(),
   beneficiaryName: z.string().min(1, 'Beneficiary name is required'),
-  place: z.string().min(1, 'Place is required'),
+  place: z.string().optional(),
   installedUnit: nonNegativeNumber,
   installedDevice: nonNegativeNumber,
   functionalUnit: nonNegativeNumber,
   functionalDevice: nonNegativeNumber,
-  cocoonPurchasedDm: nonNegativeNumber,
-  cocoonPurchasedUm: nonNegativeNumber,
-  cocoonConsumedDm: nonNegativeNumber,
-  cocoonConsumedUm: nonNegativeNumber,
-  silkProductionDm: nonNegativeNumber,
-  silkProductionUm: nonNegativeNumber,
+  ...kgFieldShape,
   rendittaDm: z.any().optional(),
   rendittaUm: z.any().optional(),
-  functionalDaysDm: nonNegativeNumber,
-  functionalDaysUm: nonNegativeNumber,
-  disposalAseDm: nonNegativeNumber,
-  disposalAseUm: nonNegativeNumber,
-  disposalPrivateDm: nonNegativeNumber,
-  disposalPrivateUm: nonNegativeNumber,
-  remarks: z.string().optional(),
 });
 
 export const mis40HeaderSchema = z.object({
-  assistantDirectorName: z.string().min(1, 'Assistant Director name is required'),
   pdlNo: z.string(),
+  regionId: z.union([z.string(), z.number()]).refine((val) => String(val).length > 0, {
+    message: 'Region is required',
+  }),
+  marketOfficeId: z.union([z.string(), z.number()]).refine((val) => String(val).length > 0, {
+    message: 'Market Office is required',
+  }),
   month: z.string().min(1, 'Month is required'),
   year: z
     .union([z.string(), z.number()])
@@ -45,7 +47,7 @@ export const mis40HeaderSchema = z.object({
 });
 
 export const mis40CategorySchema = z.object({
-  rows: z.array(mis40RowSchema).min(1, 'Add at least one beneficiary row'),
+  rows: z.array(mis40RowSchema).min(1, 'Add at least one beneficiary'),
 });
 
 export const mis40FormSchema = z.object({
@@ -58,7 +60,7 @@ export const mis40FormSchema = z.object({
   }),
   signOff: z.object({
     extensionOfficer: z.string().optional(),
-    signedAt: z.string().optional(),
+    signedAt: z.string().nullable().optional(),
   }).optional(),
 });
 

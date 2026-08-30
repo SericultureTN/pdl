@@ -19,6 +19,8 @@ import POCDashboardHome from './pages/poc/POCDashboardHome.jsx';
 import GovernmentTwistingUnitView from './pages/poc/government-twisting-unit/GovernmentTwistingUnitView.jsx';
 import PrivateReelingUnitView from './pages/poc/private-reeling-unit/PrivateReelingUnitView.jsx';
 import GovernmentReelingUnitView from './pages/poc/government-reeling-unit/GovernmentReelingUnitView.jsx';
+import SetTargetPage from './pages/poc/set-target/SetTargetPage.jsx';
+import GovtReelingReportViewerPage from './pages/poc/report-viewer/GovtReelingReportViewerPage.jsx';
 import { POC_DATA_ENTRY_ITEMS, POC_MAIN_NAV_ITEMS } from './pages/poc/pocNavConfig.js';
 import { authService } from './services/auth.js';
 import './App.css';
@@ -79,14 +81,22 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  // A plain 'user' only has their own office — send them straight to their
+  // section's dashboard instead of the cross-office admin panel.
+  const homePath = user.role === 'user'
+    ? (user.section_name === 'MIS' ? '/mis-dashboard' : '/poc-dashboard')
+    : '/';
+
+  const canManage = user.role === 'admin' || user.role === 'secondary_admin';
+
   return (
     <Routes>
-      <Route path="/" element={<Dashboard user={user} onLogout={handleLogout} />} />
+      <Route path="/" element={canManage ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to={homePath} replace />} />
       <Route path="/reports" element={<ReportsPage />} />
-      <Route path="/mis-viewer" element={<MISReportViewerPage userRole={user?.type === 'admin' ? 'admin' : user?.role} />} />
+      <Route path="/mis-viewer" element={<MISReportViewerPage userRole={user?.role === 'admin' ? 'admin' : user?.role} />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
 
-      <Route path="/mis-dashboard" element={<MISDashboardLayout onLogout={handleLogout} />}>
+      <Route path="/mis-dashboard" element={<MISDashboardLayout user={user} onLogout={handleLogout} />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<MISDashboardHome />} />
         <Route path="dfls-distribution" element={<DFLsDistributionView />} />
@@ -113,13 +123,15 @@ function App() {
 
       <Route path="/pls-dashboard" element={<PLSPage />} />
       <Route path="/prc-dashboard" element={<PRCPage />} />
-      <Route path="/poc-dashboard" element={<POCDashboardLayout onLogout={handleLogout} />}>
+      <Route path="/poc-dashboard" element={<POCDashboardLayout user={user} onLogout={handleLogout} />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<POCDashboardHome />} />
         <Route path="reports/*" element={<Navigate to="/reports" replace />} />
         <Route path="government-reeling-unit" element={<GovernmentReelingUnitView />} />
         <Route path="private-reeling-unit" element={<PrivateReelingUnitView />} />
         <Route path="twisting" element={<GovernmentTwistingUnitView />} />
+        <Route path="set-target" element={canManage ? <SetTargetPage /> : <Navigate to="dashboard" replace />} />
+        <Route path="report-viewer" element={<GovtReelingReportViewerPage />} />
         {pocPlaceholderMainItems.map((item) => (
           <Route
             key={item.path}

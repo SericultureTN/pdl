@@ -376,32 +376,6 @@ Get sericulturist statistics.
 
 ---
 
-## Database Viewer (Development Only)
-
-### GET /database/view
-View all database tables and data (No authentication required for local development).
-
-**Response:**
-```json
-{
-  "ok": true,
-  "database": {
-    "users": {
-      "columns": [...],
-      "data": [...],
-      "count": 3
-    },
-    "sericulturists": {
-      "columns": [...],
-      "data": [...],
-      "count": 3
-    }
-  }
-}
-```
-
----
-
 ## Default Login Credentials
 
 ### Admin Account

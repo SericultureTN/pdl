@@ -25,7 +25,7 @@ export default function Section({ user, selectedReport }) {
       <div className="section-header">
         <h2>
           <Building2 size={24} />
-          {user.role === 'admin' ? 'Section Reports' : `${user.ad_office} Section`}
+          {user.role === 'admin' ? 'Section Reports' : `${user.marketOfficeName} Section`}
         </h2>
       </div>
 

@@ -5,7 +5,7 @@ import MISHeader from './MISHeader.jsx';
 import { getMisRouteMeta } from './misNavConfig.js';
 import '../mispage.css';
 
-export default function MISDashboardLayout({ onLogout }) {
+export default function MISDashboardLayout({ user, onLogout }) {
   const location = useLocation();
   const { title, breadcrumb } = getMisRouteMeta(location.pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +33,7 @@ export default function MISDashboardLayout({ onLogout }) {
         <MISHeader
           title={title}
           breadcrumb={breadcrumb}
+          user={user}
           onMenuClick={() => setSidebarOpen(true)}
         />
         <div className="mis-portal-content">

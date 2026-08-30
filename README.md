@@ -20,20 +20,14 @@ A comprehensive admin dashboard for managing sericulturists and PDL (Post-Develo
    ```bash
    cd Node
    npm install
-   npm run dev          # SQLite — works immediately, no config needed
-   ```
-   - Backend runs on `http://localhost:4000`
-   - Uses SQLite (`Node/database.sqlite`) — auto-created on first run
-   - Default admin: `admin@example.com` / `Admin123!`
-
-   **Optional — PostgreSQL instead of SQLite:**
-   ```bash
-   cd Node
    npm run setup:env    # creates .env from template
    # Edit Node/.env — set DATABASE_URL with your PostgreSQL password
-   createdb pdl         # create database (once)
-   npm run dev-postgres
+   npm run setup:db     # creates the "pdl" database (once)
+   npm run dev
    ```
+   - Backend runs on `http://localhost:4000`
+   - Requires a running PostgreSQL server (see `Node/.env.example`)
+   - Default admin: `admin@example.com` / `Admin123!`
 
 3. **Frontend Setup**
    ```bash
@@ -61,8 +55,8 @@ pdl/
 │   └── package.json
 ├── Node/                  # Express backend
 │   ├── src/
-│   │   ├── index-sqlite.js    # Main server file
-│   │   └── api/         # API routes
+│   │   ├── index.js        # Main server file
+│   │   └── mis/           # MIS report routes/services
 │   └── package.json
 └── README.md
 ```
@@ -89,20 +83,16 @@ pdl/
 
 ## 🗄️ Database
 
-### Local Development (SQLite) — recommended
-- Command: `npm run dev` or `npm run dev-sqlite`
-- Database file: `Node/database.sqlite`
-- No `.env` file required
-- MIS report tables seeded automatically
+PostgreSQL only — no SQLite fallback.
 
-### Local Development (PostgreSQL)
-1. Install PostgreSQL and create a database: `createdb pdl`
-2. Run `npm run setup:env` in the `Node/` folder
-3. Edit `Node/.env` and set `DATABASE_URL` (replace `YOUR_PASSWORD`)
-4. Run `npm run dev-postgres`
-5. If env vars are missing, the server prints setup steps and exits — it will **not** start without a valid connection
+### Local Development
+1. Install PostgreSQL and run `npm run setup:env` in the `Node/` folder
+2. Edit `Node/.env` and set `DATABASE_URL` (replace `YOUR_PASSWORD`)
+3. Run `npm run setup:db` to create the `pdl` database
+4. Run `npm run dev` — MIS report tables are seeded automatically
+5. If env vars are missing or invalid, the server prints setup steps and exits — it will **not** start without a valid connection
 
-### Production (PostgreSQL)
+### Production
 - Supabase integration ready
 - Set `DATABASE_URL` in environment variables
 - Connection pooling enabled
@@ -154,10 +144,10 @@ VITE_API_URL=https://your-backend-url.com/api
 
 ### Backend
 ```bash
-npm run dev-sqlite    # Start with SQLite
-npm run dev-postgres  # Start with PostgreSQL
-npm run start-sqlite  # Production with SQLite
-npm run start-postgres # Production with PostgreSQL
+npm run setup:env    # create Node/.env from template
+npm run setup:db     # create the "pdl" PostgreSQL database
+npm run dev           # start with auto-reload
+npm run start         # start (production)
 ```
 
 ### Frontend

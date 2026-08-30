@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Package, TrendingUp, Download } from "lucide-react";
-import { sericulturistService } from "../services/sericulturist.js";
 import "./report-dashboard.css";
 
 export default function PLSDashboard({ user }) {

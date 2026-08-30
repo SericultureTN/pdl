@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { UNIT_TABLE_GROUPS } from './mis34Constants.js';
 
-export const nonNegativeNumber = z
+const nonNegativeNumber = z
   .union([z.string(), z.number()])
   .transform((val) => (val === '' || val == null ? '' : String(val)))
   .refine(
@@ -8,137 +9,58 @@ export const nonNegativeNumber = z
     { message: 'Must be a non-negative number' }
   );
 
-const requiredText = z.string().min(1, 'Required');
-const requiredSelect = z.string().min(1, 'Required');
-const requiredYear = z
-  .union([z.string(), z.number()])
-  .refine((val) => String(val).length === 4 && !Number.isNaN(Number(val)), {
-    message: 'Enter a valid 4-digit year',
-  });
+function tableShape(fields) {
+  return Object.fromEntries(
+    fields.flatMap(({ ulmKey, dmKey, umKey }) => [
+      [ulmKey, nonNegativeNumber],
+      [dmKey, nonNegativeNumber],
+      [umKey, z.any().optional()], // always derived (ulm + dm), never entered directly
+    ])
+  );
+}
+
+const productionDetailsShape = {
+  spindlesInstalled: nonNegativeNumber,
+  installedProductionCapacity: nonNegativeNumber,
+  spindlesInUse: nonNegativeNumber,
+};
+
+const unitShapeFromGroups = Object.fromEntries(
+  UNIT_TABLE_GROUPS.map(({ path, fields }) => [
+    path,
+    path === 'productionDetails'
+      ? z.object({ ...productionDetailsShape, ...tableShape(fields) })
+      : z.object(tableShape(fields)),
+  ])
+);
+
+export const mis34UnitSchema = z.object({
+  id: z.string(),
+  unitName: z.string().min(1, 'Unit name is required'),
+  unitCode: z.string().optional(),
+  ...unitShapeFromGroups,
+});
 
 export const mis34HeaderSchema = z.object({
-  unitName: requiredText,
-  unitCode: requiredText,
-  adCode: requiredText,
-  disCode: requiredText,
-  regCode: requiredText,
-  month: requiredSelect,
-  year: requiredYear,
-});
-
-const matrixRowSchema = z.object({
-  outlayDm: nonNegativeNumber,
-  outlayUm: nonNegativeNumber,
-  outlayAnnual: nonNegativeNumber,
-  expensesDm: nonNegativeNumber,
-  expensesUm: nonNegativeNumber,
-  expensesAnnual: nonNegativeNumber,
-});
-
-const periodPairSchema = z.object({
-  duringMonth: nonNegativeNumber,
-  uptoMonth: nonNegativeNumber,
-});
-
-const warpWeftPairSchema = z.object({
-  warp: nonNegativeNumber,
-  weft: nonNegativeNumber,
-});
-
-const periodWarpWeftSchema = z.object({
-  duringMonth: warpWeftPairSchema,
-  uptoMonth: warpWeftPairSchema,
-});
-
-const stockParticularRowSchema = z.object({
-  openingBalance: nonNegativeNumber,
-  purchasedQty: nonNegativeNumber,
-  purchasedValue: nonNegativeNumber,
-  ownProduction: nonNegativeNumber,
-  underProcess: nonNegativeNumber,
-  salesQty: nonNegativeNumber,
-  salesValue: nonNegativeNumber,
-  transferStock: nonNegativeNumber,
-  closingBalance: z.any().optional(),
-});
-
-const receiptRowSchema = z.object({
-  valueRs: nonNegativeNumber,
-  cash: nonNegativeNumber,
-});
-
-const silkSalesRowSchema = z.object({
-  qtyDm: nonNegativeNumber,
-  qtyUm: nonNegativeNumber,
-  valueDm: nonNegativeNumber,
-  valueUm: nonNegativeNumber,
-});
-
-export const mis34Tab1Schema = z.object({
-  achievementPhysical: z.object({
-    rawProducedTarget: nonNegativeNumber,
-    rawProducedAchieved: nonNegativeNumber,
-    twistedSilkTarget: nonNegativeNumber,
-    twistedSilkAchieved: nonNegativeNumber,
+  regionId: z.union([z.string(), z.number()]).refine((val) => String(val).length > 0, {
+    message: 'Region is required',
   }),
-  achievementFinancial: z.object({
-    salary: matrixRowSchema,
-    cocoonCost: matrixRowSchema,
-    rawSilkCost: matrixRowSchema,
-    wages: matrixRowSchema,
-    eb: matrixRowSchema,
-    maintenance: matrixRowSchema,
-    others: matrixRowSchema,
+  marketOfficeId: z.union([z.string(), z.number()]).refine((val) => String(val).length > 0, {
+    message: 'Market Office is required',
   }),
-  productionDetails: z.record(nonNegativeNumber),
-  stockParticulars: z.record(stockParticularRowSchema),
-  receipts: z.record(receiptRowSchema),
-  silkSalesRealisation: z.record(silkSalesRowSchema),
-});
-
-export const mis34Tab2Schema = z.object({
-  rawSilkPurchased: z.object({
-    openingBalance: periodPairSchema,
-    purchasedReceived: z.object({
-      duringMonth: nonNegativeNumber,
-      uptoMonth: nonNegativeNumber,
-      sourceUnit: z.string().optional(),
+  month: z.string().min(1, 'Month is required'),
+  year: z
+    .union([z.string(), z.number()])
+    .refine((val) => String(val).length === 4 && !Number.isNaN(Number(val)), {
+      message: 'Enter a valid 4-digit year',
     }),
-    issuedForTwisting: periodPairSchema,
-    closingBalance: periodPairSchema.partial().optional(),
-  }),
-  machineStock: z.record(periodPairSchema),
-  readySilkTwisting: z.record(periodWarpWeftSchema),
-  nscExpenditure: z.record(z.object({
-    duringMonth: nonNegativeNumber,
-    uptoMonth: nonNegativeNumber,
-  })),
 });
-
-export const mis34Tab3Schema = z.object({
-  costOfProduction: z.object({
-    totalNscExpenditure: z.any().optional(),
-    lessTwistedWasteSale: nonNegativeNumber,
-    netExpenditure: z.any().optional(),
-    costPerKgReadySilk: z.any().optional(),
-  }),
-  estimatedReceiptDetails: z.record(nonNegativeNumber),
-  actualReceiptDetails: z.record(z.any()),
-  capacityOfUnit: z.record(nonNegativeNumber),
-  profitLoss: z.any().optional(),
-});
-
-export const MIS34_TAB_SCHEMAS = {
-  header: mis34HeaderSchema,
-  tab1: mis34Tab1Schema,
-  tab2: mis34Tab2Schema,
-  tab3: mis34Tab3Schema,
-};
 
 export const mis34FormSchema = z.object({
   header: mis34HeaderSchema,
-  tab1: mis34Tab1Schema,
-  tab2: mis34Tab2Schema,
-  tab3: mis34Tab3Schema,
-  meta: z.any().optional(),
+  units: z.array(mis34UnitSchema).min(1, 'Add at least one twisting unit'),
 });
+
+export function validateUnit(unit) {
+  return mis34UnitSchema.safeParse(unit);
+}

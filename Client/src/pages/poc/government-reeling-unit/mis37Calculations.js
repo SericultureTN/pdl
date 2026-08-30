@@ -1,10 +1,10 @@
 import {
   FINANCIAL_BUDGET_ROWS,
-  FINANCIAL_CATEGORY_TYPES,
+  PRODUCTION_WORK_ROWS,
   RECEIPT_ITEMS,
-  SILK_SALES_ROWS,
   COCOON_STOCK_ROWS,
   NSC_EXPENDITURE_ROWS,
+  STOCK_KGS_ITEMS,
 } from './mis37Constants.js';
 
 function num(value) {
@@ -45,14 +45,14 @@ export function computeTimePeriod(period) {
   };
 }
 
-/** Budget U.M = Budget U.L.M + Budget D.M; Actual Annual = Budget Annual − Budget U.M */
+/** Variance = Budget Outlay − Expenses (D.M) — both this month's flat figures.
+ * Budget Outlay is the full yearly figure, unchanged every month (no ÷12, no
+ * carry-forward); Expenses is a plain per-month manual entry. */
 export function computeFinancialCategory(category) {
   if (!category || typeof category !== 'object') return category;
-  const budgetUm = round2(num(category.budgetUlM) + num(category.budgetDm));
   return {
     ...category,
-    budgetUm,
-    actualAnnual: round2(num(category.budgetAnnual) - budgetUm),
+    variance: round2(num(category.budgetOutlay) - num(category.expenses)),
   };
 }
 
@@ -73,15 +73,74 @@ function computeClosingStock(cocoonStock) {
 }
 
 
-function computeCostDetails(tab2) {
-  Object.keys(tab2.costDetails).forEach((key) => {
-    tab2.costDetails[key] = computeTimePeriod(tab2.costDetails[key]);
-  });
-  return tab2.costDetails;
+function divide(numerator, denominator) {
+  return denominator ? round2(numerator / denominator) : 0;
 }
 
+function ensureDmUm(value) {
+  if (!value || typeof value !== 'object') return { dm: '', um: '' };
+  return { dm: value.dm ?? '', um: value.um ?? '' };
+}
+
+/**
+ * Cost Details has no U.L.M column — every field is a rate/ratio, so summing across
+ * months would be meaningless and nothing here rolls forward. "Manual entry" rows just
+ * mirror D.M into U.M for the current month; the rest are fully derived (see
+ * COST_DETAIL_FIELDS comment for formulas), pulling from Tab 1 Stock Particulars, Cocoon
+ * Stock Movement, NSC Expenditure, and Production Details — so those source sections must
+ * already be computed before this runs.
+ */
+function computeCostDetails(tab2, tab1) {
+  const cd = tab2.costDetails;
+  Object.keys(cd).forEach((key) => {
+    cd[key] = ensureDmUm(cd[key]);
+  });
+
+  ['avgSrPercentCocoon', 'assessedRendita', 'assessedSilkKg', 'avgCocoonCostPerKg'].forEach((key) => {
+    cd[key].um = round2(num(cd[key].dm));
+  });
+
+  // Actual Silk Kg is auto-fetched from Tab 1 Achievement to Target — Physical → Achieved
+  // (Kgs), same D.M/U.M column — not typed in here.
+  const achieved = tab1?.achievementPhysical?.achieved || {};
+  cd.actualSilkKg.dm = num(achieved.dm);
+  cd.actualSilkKg.um = num(achieved.um);
+
+  const actualSilkKgDm = num(cd.actualSilkKg.dm);
+  const actualSilkKgUm = num(cd.actualSilkKg.um);
+  const nsc = tab2.nscExpenditure || {};
+  const reeledQty = tab2.cocoonStockMovement?.reeled?.qty || {};
+  const cocoonConsumed = num(tab1?.stockParticulars?.cocoon?.consumedSoldDisposed);
+  const mandaysUsed = tab1?.productionDetails?.mandaysUsed || {};
+
+  // D.M uses this month's cocoon consumed (Stock Particulars has no cumulative figure);
+  // U.M uses the genuine cumulative Reeled Qty from Cocoon Stock Movement (kg/kg, same units).
+  cd.actualRendita.dm = divide(cocoonConsumed, actualSilkKgDm);
+  cd.actualRendita.um = divide(num(reeledQty.um), actualSilkKgUm);
+
+  cd.fuelCostPerKg.dm = divide(num(nsc.fuelCost?.dm), actualSilkKgDm);
+  cd.fuelCostPerKg.um = divide(num(nsc.fuelCost?.um), actualSilkKgUm);
+
+  const conversionKeys = ['wagesPaid', 'fuelCost', 'ebCharges', 'maintenanceCharges', 'transportCharges', 'others'];
+  const conversionDm = conversionKeys.reduce((acc, key) => acc + num(nsc[key]?.dm), 0);
+  const conversionUm = conversionKeys.reduce((acc, key) => acc + num(nsc[key]?.um), 0);
+  cd.conversionCostPerKg.dm = divide(conversionDm, actualSilkKgDm);
+  cd.conversionCostPerKg.um = divide(conversionUm, actualSilkKgUm);
+
+  cd.mandaysPerKg.dm = divide(num(mandaysUsed.dm), actualSilkKgDm);
+  cd.mandaysPerKg.um = divide(num(mandaysUsed.um), actualSilkKgUm);
+
+  return cd;
+}
+
+/**
+ * Cost of Production/Kg (with/without staff) are derived from Total NSC Expenditure and
+ * Actual Silk Kg (from Cost Details, which must already be computed) rather than typed
+ * in — their U.L.M is unused/dead, same as Cost Details. The other rows in this section
+ * (Total NSC, Sale Value of Bye Products, Net NSC) are unchanged and still use U.L.M.
+ */
 function computeCostOfProduction(tab2) {
-  const nsc = tab2.nscExpenditure;
+  const nsc = tab2.nscExpenditure || {};
   tab2.costOfProduction = ensureCostOfProductionShape(tab2.costOfProduction);
   const cop = tab2.costOfProduction;
 
@@ -99,8 +158,21 @@ function computeCostOfProduction(tab2) {
     um: round2(num(cop.totalNscExpenditure.um) - num(cop.saleValueByeProducts.um)),
   };
 
-  cop.costPerKgWithStaff = computeTimePeriod(cop.costPerKgWithStaff);
-  cop.costPerKgWithoutStaff = computeTimePeriod(cop.costPerKgWithoutStaff);
+  const actualSilkKg = tab2.costDetails?.actualSilkKg || {};
+  const actualSilkKgDm = num(actualSilkKg.dm);
+  const actualSilkKgUm = num(actualSilkKg.um);
+
+  cop.costPerKgWithStaff.dm = divide(num(cop.totalNscExpenditure.dm), actualSilkKgDm);
+  cop.costPerKgWithStaff.um = divide(num(cop.totalNscExpenditure.um), actualSilkKgUm);
+
+  cop.costPerKgWithoutStaff.dm = divide(
+    num(cop.totalNscExpenditure.dm) - num(nsc.wagesPaid?.dm),
+    actualSilkKgDm
+  );
+  cop.costPerKgWithoutStaff.um = divide(
+    num(cop.totalNscExpenditure.um) - num(nsc.wagesPaid?.um),
+    actualSilkKgUm
+  );
 
   return cop;
 }
@@ -108,68 +180,70 @@ function computeCostOfProduction(tab2) {
 export function applyMis37Calculations(data) {
   const next = structuredClone(data);
 
-  // Tab 1: Achievement physical — U.M = U.L.M + D.M
+  // Tab 1: Achievement physical — U.M = U.L.M + D.M. Achieved D.M is the manually entered
+  // source of truth.
   Object.keys(next.tab1.achievementPhysical).forEach((key) => {
     next.tab1.achievementPhysical[key] = computeTimePeriod(next.tab1.achievementPhysical[key]);
   });
 
   // Tab 1: Achievement financial
   FINANCIAL_BUDGET_ROWS.forEach(({ key: rowKey }) => {
-    FINANCIAL_CATEGORY_TYPES.forEach(({ key: typeKey }) => {
-      next.tab1.achievementFinancial[rowKey][typeKey] = computeFinancialCategory(
-        next.tab1.achievementFinancial[rowKey][typeKey]
-      );
-    });
+    next.tab1.achievementFinancial[rowKey] = computeFinancialCategory(
+      next.tab1.achievementFinancial[rowKey]
+    );
   });
 
-  // Tab 1: Rendita % = (Cocoon Used Kg ÷ Silk Produced Kg) × 100
-  const cocoonUsed = num(next.tab1.productionDetails.cocoonUsedKg);
-  const silkProduced = num(next.tab1.productionDetails.silkProducedQty);
-  next.tab1.productionDetails.renditaPercent = silkProduced > 0
-    ? round2((cocoonUsed / silkProduced) * 100)
-    : '';
+  // Tab 1: Production Details — Days Worked / Mandays Used: U.M = U.L.M + D.M
+  PRODUCTION_WORK_ROWS.forEach(({ key }) => {
+    next.tab1.productionDetails[key] = computeTimePeriod(next.tab1.productionDetails[key]);
+  });
 
-  // Tab 1: Stock particulars — Closing = Opening + Added − Under Process
+  // Tab 1: Stock particulars — Total = Opening + Added; Closing = Total − Consumed/Sold/Disposed
   Object.values(next.tab1.stockParticulars).forEach((row) => {
     const opening = num(row.openingBalance);
     const added = num(row.stockAdded);
-    const underProcess = num(row.underProcess);
-    row.closingBalance = round2(opening + added - underProcess);
+    row.total = round2(opening + added);
+    const consumedSoldDisposed = num(row.consumedSoldDisposed);
+    row.closingBalance = round2(row.total - consumedSoldDisposed);
   });
 
-  // Tab 1: Receipts — U.M on valueRs and cash
+  // Tab 1: Receipts — U.M on valueRs
   RECEIPT_ITEMS.forEach(({ key }) => {
     if (next.tab1.receipts[key]) {
       next.tab1.receipts[key].valueRs = computeTimePeriod(next.tab1.receipts[key].valueRs);
-      next.tab1.receipts[key].cash = computeTimePeriod(next.tab1.receipts[key].cash);
     }
   });
 
-  // Tab 1: Silk sales — U.M on qty and value
-  SILK_SALES_ROWS.forEach(({ key }) => {
-    if (next.tab1.silkSalesRealisation[key]) {
-      next.tab1.silkSalesRealisation[key].qty = computeTimePeriod(
-        next.tab1.silkSalesRealisation[key].qty
-      );
-      next.tab1.silkSalesRealisation[key].value = computeTimePeriod(
-        next.tab1.silkSalesRealisation[key].value
-      );
-    }
-  });
-
-  // Tab 2: Cocoon stock — U.M = U.L.M + D.M; closing derived
-  COCOON_STOCK_ROWS.filter((r) => !r.computed).forEach(({ key }) => {
+  // Tab 2: Cocoon stock — U.M = U.L.M + D.M; closing derived. Opening Balance/Purchased/
+  // Reeled Qty D.M is auto-fetched from Tab 1 Stock Particulars → Cocoon rather than typed
+  // in — see COCOON_STOCK_ROWS comment. Their Value D.M stays manual.
+  const cocoon = next.tab1.stockParticulars?.cocoon || {};
+  const qtyDmSource = {
+    openingBalance: cocoon.openingBalance,
+    purchased: cocoon.stockAdded,
+    reeled: cocoon.consumedSoldDisposed,
+  };
+  COCOON_STOCK_ROWS.filter((r) => !r.computed).forEach(({ key, qtyDmAutoFetched }) => {
     const row = next.tab2.cocoonStockMovement[key];
     if (row) {
+      if (qtyDmAutoFetched) {
+        row.qty.dm = num(qtyDmSource[key]);
+      }
       row.qty = computeTimePeriod(row.qty);
       row.value = computeTimePeriod(row.value);
     }
   });
   computeClosingStock(next.tab2.cocoonStockMovement);
 
-  // Tab 2: NSC Expenditure — U.M per field; total summed per column (ulm, dm, um)
-  const nscKeys = NSC_EXPENDITURE_ROWS.filter((r) => !r.computed).map((r) => r.key);
-  nscKeys.forEach((key) => {
+  // Tab 2: NSC Expenditure — D.M is auto-fetched from Tab 1 Financial Control Budget's
+  // Budget D.M for the matching category (same keys), not typed in here. U.M per field;
+  // total summed per column (ulm, dm, um).
+  const nscRows = NSC_EXPENDITURE_ROWS.filter((r) => !r.computed);
+  const nscKeys = nscRows.map((r) => r.key);
+  nscRows.forEach(({ key, dmAutoFetched }) => {
+    if (dmAutoFetched) {
+      next.tab2.nscExpenditure[key].dm = num(next.tab1.achievementFinancial?.[key]?.expenses);
+    }
     next.tab2.nscExpenditure[key] = computeTimePeriod(next.tab2.nscExpenditure[key]);
   });
   next.tab2.nscExpenditure.total = {
@@ -178,45 +252,73 @@ export function applyMis37Calculations(data) {
     um: round2(nscKeys.reduce((acc, key) => acc + num(next.tab2.nscExpenditure[key]?.um), 0)),
   };
 
-  next.tab2.costDetails = computeCostDetails(next.tab2);
+  next.tab2.costDetails = computeCostDetails(next.tab2, next.tab1);
   next.tab2.costOfProduction = computeCostOfProduction(next.tab2);
 
   const totalNscDm = num(next.tab2.nscExpenditure.total?.dm);
   const totalNscUm = num(next.tab2.nscExpenditure.total?.um);
 
-  // Tab 3: Stock details kgs totals and closing
-  Object.values(next.tab3.stockDetailsKgs).forEach((row) => {
-    const opening = num(row.openingBalance);
-    const purchase = num(row.purchase);
-    const sold = num(row.soldIssued);
-    row.total = round2(opening + purchase);
-    row.closingBalance = round2(row.total - sold);
+  // Tab 3: Stock Details (Kgs) — live mirror of Tab 1 Stock Particulars for matching items
+  // (Opening Balance / Purchase / Sold-Issued <- Opening Balance / Stock Added / Consumed-Sold-Disposed).
+  // Fire Wood has no Tab 1 counterpart, so it stays independently entered.
+  STOCK_KGS_ITEMS.forEach(({ key, stockParticularKey }) => {
+    const row = next.tab3.stockDetailsKgs[key];
+    if (!row) return;
+    if (stockParticularKey) {
+      const source = next.tab1.stockParticulars[stockParticularKey] || {};
+      row.openingBalance = num(source.openingBalance);
+      row.purchase = num(source.stockAdded);
+      row.soldIssued = num(source.consumedSoldDisposed);
+    }
+    row.total = round2(num(row.openingBalance) + num(row.purchase));
+    row.closingBalance = round2(row.total - num(row.soldIssued));
   });
 
-  const rawDm = num(next.tab3.estimatedSaleValue.rawSilk.dm);
-  const rawUm = num(next.tab3.estimatedSaleValue.rawSilk.um);
-  const byeDm = num(next.tab3.estimatedSaleValue.byeProducts.dm);
-  const byeUm = num(next.tab3.estimatedSaleValue.byeProducts.um);
-  next.tab3.estimatedSaleValue.total.dm = round2(rawDm + byeDm);
-  next.tab3.estimatedSaleValue.total.um = round2(rawUm + byeUm);
+  // Tab 3: Estimated Sale Value — Raw Silk is U.L.M/D.M/U.M (D.M typed directly as a Rupee
+  // total). Bye Products is a read-only mirror of Tab 2 Cost of Production's
+  // "Sale Value of Bye Products" (same D.M/U.M, plus U.L.M for column symmetry).
+  next.tab3.estimatedSaleValue.rawSilk = computeTimePeriod(next.tab3.estimatedSaleValue.rawSilk);
+  next.tab3.estimatedSaleValue.byeProducts = {
+    ulm: num(next.tab2.costOfProduction.saleValueByeProducts?.ulm),
+    dm: num(next.tab2.costOfProduction.saleValueByeProducts?.dm),
+    um: num(next.tab2.costOfProduction.saleValueByeProducts?.um),
+  };
 
+  const rawSilk = next.tab3.estimatedSaleValue.rawSilk;
+  const byeProducts = next.tab3.estimatedSaleValue.byeProducts;
+  next.tab3.estimatedSaleValue.total = {
+    ulm: round2(num(rawSilk.ulm) + num(byeProducts.ulm)),
+    dm: round2(num(rawSilk.dm) + num(byeProducts.dm)),
+    um: round2(num(rawSilk.um) + num(byeProducts.um)),
+  };
+
+  // Tab 3: Actual Receipt Details (Section VII) — 2 items (Silk Sold, Bye Products Sold),
+  // each split into Current Year / Previous Year. Every leaf row is U.L.M/D.M/U.M x
+  // Qty/Value (enter D.M only; U.M = U.L.M + D.M; U.L.M carries forward monthly). No
+  // total or pending rows.
   const silk = next.tab3.actualReceiptDetails.silkSold;
-  silk.total.qty = round2(num(silk.currentYear.qty) + num(silk.previousYear.qty));
-  silk.total.value = round2(num(silk.currentYear.value) + num(silk.previousYear.value));
+  silk.currentYear.qty = computeTimePeriod(silk.currentYear.qty);
+  silk.currentYear.value = computeTimePeriod(silk.currentYear.value);
+  silk.previousYear.qty = computeTimePeriod(silk.previousYear.qty);
+  silk.previousYear.value = computeTimePeriod(silk.previousYear.value);
 
   const bye = next.tab3.actualReceiptDetails.byeProductsSold;
-  bye.total.qty = round2(num(bye.currentYear.qty) + num(bye.previousYear.qty));
-  bye.total.value = round2(num(bye.currentYear.value) + num(bye.previousYear.value));
+  bye.currentYear.qty = computeTimePeriod(bye.currentYear.qty);
+  bye.currentYear.value = computeTimePeriod(bye.currentYear.value);
+  bye.previousYear.qty = computeTimePeriod(bye.previousYear.qty);
+  bye.previousYear.value = computeTimePeriod(bye.previousYear.value);
 
+  // D.M Profit/Loss compares this month's expenditure against this month's estimated sale value.
   const estimatedTotalDm = num(next.tab3.estimatedSaleValue.total.dm);
-  const silkSoldValue = num(silk.total.value);
-  const byeSoldValue = num(bye.total.value);
-  const pendingCurrent = num(next.tab3.actualReceiptDetails.pendingWithExchange.currentYear);
-  const pendingPrevious = num(next.tab3.actualReceiptDetails.pendingWithExchange.previousYear);
-  const pendingTotal = pendingCurrent + pendingPrevious;
-
   const dmProfitLoss = round2(totalNscDm - estimatedTotalDm);
-  const umReceipts = silkSoldValue + byeSoldValue + pendingTotal;
+
+  // U.M Profit/Loss includes Current Year AND Previous Year for Silk/Bye — pending rows no
+  // longer exist in this section.
+  const umReceipts =
+    num(silk.currentYear.value.um) +
+    num(silk.previousYear.value.um) +
+    num(bye.currentYear.value.um) +
+    num(bye.previousYear.value.um);
   const umProfitLoss = round2(totalNscUm - umReceipts);
 
   next.tab3.profitLoss.dm = dmProfitLoss;

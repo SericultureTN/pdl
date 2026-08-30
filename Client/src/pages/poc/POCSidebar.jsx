@@ -9,6 +9,7 @@ import {
   LogOut,
   ChevronDown,
   ChevronRight,
+  Target,
 } from 'lucide-react';
 import {
   POC_DATA_ENTRY_ITEMS,
@@ -23,6 +24,7 @@ export default function POCSidebar({ open = false, onLogout, onNavigate }) {
   const location = useLocation();
 
   const dashboardItem = POC_MAIN_NAV_ITEMS.find((item) => item.path === 'dashboard');
+  const setTargetItem = POC_MAIN_NAV_ITEMS.find((item) => item.path === 'set-target');
   const analyticsItem = POC_MAIN_NAV_ITEMS.find((item) => item.path === 'analytics');
   const userManagementItem = POC_MAIN_NAV_ITEMS.find((item) => item.path === 'user-management');
   const settingsItem = POC_MAIN_NAV_ITEMS.find((item) => item.path === 'settings');
@@ -67,6 +69,7 @@ export default function POCSidebar({ open = false, onLogout, onNavigate }) {
 
       <nav className="mis-portal-nav">
         {navLink(dashboardItem, <LayoutDashboard size={18} />)}
+        {navLink(setTargetItem, <Target size={18} />)}
 
         <div className="mis-portal-nav-group">
           <div className="mis-portal-nav-item mis-portal-nav-parent">

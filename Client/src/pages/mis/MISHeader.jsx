@@ -1,7 +1,17 @@
 import { Link } from 'react-router-dom';
 import { Menu, Bell, ChevronDown, ArrowLeft } from 'lucide-react';
 
-export default function MISHeader({ title, breadcrumb, onMenuClick }) {
+const ROLE_LABELS = { admin: 'Admin', secondary_admin: 'Secondary Admin', user: 'AD Office User' };
+
+function initials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('');
+}
+
+export default function MISHeader({ title, breadcrumb, user, onMenuClick }) {
+  const displayName = user?.office_name || user?.name || 'User';
+  const displayRole = ROLE_LABELS[user?.role] || user?.role || '';
+
   return (
     <header className="mis-portal-header">
       <div className="mis-portal-header-left">
@@ -27,14 +37,13 @@ export default function MISHeader({ title, breadcrumb, onMenuClick }) {
 
         <button type="button" className="mis-portal-notification" aria-label="Notifications">
           <Bell size={20} />
-          <span className="mis-portal-notification-badge">3</span>
         </button>
 
         <button type="button" className="mis-portal-profile">
-          <span className="mis-portal-profile-avatar">AS</span>
+          <span className="mis-portal-profile-avatar">{initials(user?.name)}</span>
           <span className="mis-portal-profile-info">
-            <span className="mis-portal-profile-name">AD Salem</span>
-            <span className="mis-portal-profile-role">AD Office User</span>
+            <span className="mis-portal-profile-name">{displayName}</span>
+            <span className="mis-portal-profile-role">{displayRole}</span>
           </span>
           <ChevronDown size={16} />
         </button>

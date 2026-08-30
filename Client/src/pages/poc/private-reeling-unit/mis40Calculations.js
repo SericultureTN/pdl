@@ -1,4 +1,4 @@
-import { NUMERIC_ROW_FIELDS } from './mis40Constants.js';
+import { NUMERIC_ROW_FIELDS, KG_FIELD_GROUPS } from './mis40Constants.js';
 
 function num(value) {
   const parsed = Number(value);
@@ -7,6 +7,15 @@ function num(value) {
 
 function round2(value) {
   return Math.round(value * 100) / 100;
+}
+
+/** U.M is never entered directly — always U.L.M + D.M for each Kg field group. */
+export function computeRowUm(row) {
+  const next = { ...row };
+  KG_FIELD_GROUPS.forEach(({ ulmKey, dmKey, umKey }) => {
+    next[umKey] = round2(num(row[ulmKey]) + num(row[dmKey]));
+  });
+  return next;
 }
 
 export function computeRowRenditta(row) {
@@ -25,16 +34,17 @@ export function computeRowRenditta(row) {
 export function computeRowsWithCalculations(rows) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row, index) => ({
-    ...computeRowRenditta(row),
+    ...computeRowRenditta(computeRowUm(row)),
     sNo: index + 1,
   }));
 }
 
 export function computeTotalRow(rows) {
+  const computedRows = computeRowsWithCalculations(rows);
   const totals = { label: 'TOTAL', isTotal: true };
 
   NUMERIC_ROW_FIELDS.forEach((field) => {
-    totals[field] = round2(rows.reduce((acc, row) => acc + num(row[field]), 0));
+    totals[field] = round2(computedRows.reduce((acc, row) => acc + num(row[field]), 0));
   });
 
   const consumedDm = num(totals.cocoonConsumedDm);
@@ -57,7 +67,7 @@ export function createRowId() {
 }
 
 export function createEmptyRow() {
-  return {
+  const row = {
     id: createRowId(),
     beneficiaryName: '',
     place: '',
@@ -65,20 +75,13 @@ export function createEmptyRow() {
     installedDevice: '',
     functionalUnit: '',
     functionalDevice: '',
-    cocoonPurchasedDm: '',
-    cocoonPurchasedUm: '',
-    cocoonConsumedDm: '',
-    cocoonConsumedUm: '',
-    silkProductionDm: '',
-    silkProductionUm: '',
     rendittaDm: '',
     rendittaUm: '',
-    functionalDaysDm: '',
-    functionalDaysUm: '',
-    disposalAseDm: '',
-    disposalAseUm: '',
-    disposalPrivateDm: '',
-    disposalPrivateUm: '',
-    remarks: '',
   };
+  KG_FIELD_GROUPS.forEach(({ ulmKey, dmKey, umKey }) => {
+    row[ulmKey] = 0;
+    row[dmKey] = '';
+    row[umKey] = '';
+  });
+  return row;
 }

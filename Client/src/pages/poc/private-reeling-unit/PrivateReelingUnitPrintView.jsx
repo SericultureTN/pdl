@@ -7,9 +7,7 @@ import {
 import { computeRowsWithCalculations, computeTotalRow } from './mis40Calculations.js';
 import { getAbstractAsTableData } from './mis40AbstractQuery.js';
 
-export default function PrivateReelingUnitPrintView({ values, onClose }) {
-  const { header, categories } = values;
-
+export default function PrivateReelingUnitPrintView({ header, categories, onClose }) {
   const handlePrint = () => window.print();
 
   return (
@@ -32,7 +30,7 @@ export default function PrivateReelingUnitPrintView({ values, onClose }) {
           <p className="text-xs uppercase tracking-widest text-slate-500">PDL {MIS40_FORM_CODE}</p>
           <h1 className="text-xl font-bold">{MIS40_REPORT_TITLE}</h1>
           <p className="mt-2 text-sm">
-            Assistant Director: {header.assistantDirectorName || '—'} | {header.month || '—'} {header.year || '—'}
+            {header.month || '—'} {header.year || '—'}
           </p>
         </div>
 
@@ -94,6 +92,8 @@ export default function PrivateReelingUnitPrintView({ values, onClose }) {
                 <th className="border border-slate-300 px-2 py-1">Cocoon Cons UM</th>
                 <th className="border border-slate-300 px-2 py-1">Silk Prod DM</th>
                 <th className="border border-slate-300 px-2 py-1">Silk Prod UM</th>
+                <th className="border border-slate-300 px-2 py-1">Capacity DM</th>
+                <th className="border border-slate-300 px-2 py-1">Capacity UM</th>
                 <th className="border border-slate-300 px-2 py-1">ASE DM</th>
                 <th className="border border-slate-300 px-2 py-1">ASE UM</th>
                 <th className="border border-slate-300 px-2 py-1">Private DM</th>
@@ -114,6 +114,8 @@ export default function PrivateReelingUnitPrintView({ values, onClose }) {
                   <td className="border border-slate-200 px-2 py-0.5 text-right">{row.cocoonConsumedUm ?? 0}</td>
                   <td className="border border-slate-200 px-2 py-0.5 text-right">{row.silkProductionDm ?? 0}</td>
                   <td className="border border-slate-200 px-2 py-0.5 text-right">{row.silkProductionUm ?? 0}</td>
+                  <td className="border border-slate-200 px-2 py-0.5 text-right">{row.silkProductionCapacityDm ?? 0}</td>
+                  <td className="border border-slate-200 px-2 py-0.5 text-right">{row.silkProductionCapacityUm ?? 0}</td>
                   <td className="border border-slate-200 px-2 py-0.5 text-right">{row.disposalAseDm ?? 0}</td>
                   <td className="border border-slate-200 px-2 py-0.5 text-right">{row.disposalAseUm ?? 0}</td>
                   <td className="border border-slate-200 px-2 py-0.5 text-right">{row.disposalPrivateDm ?? 0}</td>
