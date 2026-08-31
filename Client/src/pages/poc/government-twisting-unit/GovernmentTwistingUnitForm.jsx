@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Lock, Pencil, Plus, Printer, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { authService } from '../../../services/auth.js';
-import RegionMarketOfficeSelect from '../../../components/RegionMarketOfficeSelect.jsx';
+import GovtTwistingOfficeSelect from '../../../components/GovtTwistingOfficeSelect.jsx';
 import FiscalYearMonthPicker, {
   getFyStart,
   resolveMonthInFy,
@@ -193,34 +193,24 @@ export default function GovernmentTwistingUnitForm() {
   const [saving, setSaving] = useState(false);
 
   const [currentUserRole, setCurrentUserRole] = useState(null);
-  const [ownOfficeId, setOwnOfficeId] = useState(null);
-  const [ownRegionId, setOwnRegionId] = useState(null);
   const [browseFyStart, setBrowseFyStart] = useState(currentFyStart);
 
   const isLocked = isReportLocked(meta);
-  const isOfficeLockedForRole = currentUserRole === 'user';
 
   const activePeriodRef = useRef(getPeriodKey(header));
   const skipPeriodSwitchRef = useRef(true);
 
   useEffect(() => {
     authService.getCurrentUser()
-      .then((result) => {
-        const user = result?.user;
-        setCurrentUserRole(user?.role || null);
-        if (user?.role === 'user') {
-          setOwnOfficeId(user.office_id ?? null);
-          setOwnRegionId(user.group_id ?? null);
-        }
-      })
+      .then((result) => setCurrentUserRole(result?.user?.role || null))
       .catch(() => setCurrentUserRole(null));
   }, []);
 
-  useEffect(() => {
-    if (currentUserRole !== 'user' || !ownOfficeId || !ownRegionId) return;
-    if (header.marketOfficeId === ownOfficeId) return;
-    setHeader((prev) => ({ ...prev, regionId: ownRegionId, marketOfficeId: ownOfficeId }));
-  }, [currentUserRole, ownOfficeId, ownRegionId, header.marketOfficeId]);
+  // NOTE: no "lock to own office" effect here — Government Twisting Unit
+  // offices now live in their own table (govt_twisting_offices) with their
+  // own id space, disjoint from poc_users.office_id (which still points at
+  // the shared poc_offices used by Private Reeling). Same precedent as
+  // Government Reeling Unit: a 'user' picks their office freely each time.
 
   // Switching Region/Office/Month/Year loads that period's report — server-synced
   // first, then U.L.M-carried-forward local draft — same pattern as the other 2 forms.
@@ -478,7 +468,7 @@ export default function GovernmentTwistingUnitForm() {
       // than leaving this month's just-submitted values on screen.
       const freshDraft = result.nextDraft || {
         ...createMis34DefaultValues(),
-        header: { ...createMis34DefaultValues().header, adCode: result.submittedReport.header.adCode, disCode: result.submittedReport.header.disCode, regCode: result.submittedReport.header.regCode, regionId: result.submittedReport.header.regionId, marketOfficeId: result.submittedReport.header.marketOfficeId },
+        header: { ...createMis34DefaultValues().header, adCode: result.submittedReport.header.adCode, disCode: result.submittedReport.header.disCode, regCode: result.submittedReport.header.regCode, region: result.submittedReport.header.region, marketOfficeId: result.submittedReport.header.marketOfficeId },
       };
       skipPeriodSwitchRef.current = true;
       setHeader(freshDraft.header);
@@ -578,17 +568,17 @@ export default function GovernmentTwistingUnitForm() {
           {headerErrors.month && <p className="mt-1 text-xs text-red-600">{headerErrors.month}</p>}
         </div>
         <div className="mt-4">
-          <RegionMarketOfficeSelect
-            regionId={header.regionId || null}
-            marketOfficeId={header.marketOfficeId || null}
-            onChange={({ regionId, marketOfficeId }) =>
-              setHeader((prev) => ({ ...prev, regionId: regionId ?? '', marketOfficeId: marketOfficeId ?? '' }))
+          <GovtTwistingOfficeSelect
+            region={header.region || null}
+            officeId={header.marketOfficeId || null}
+            onChange={({ region, officeId }) =>
+              setHeader((prev) => ({ ...prev, region: region ?? '', marketOfficeId: officeId ?? '' }))
             }
-            disabled={isLocked || isOfficeLockedForRole}
+            disabled={isLocked}
             required
           />
-          {(headerErrors.regionId || headerErrors.marketOfficeId) && (
-            <p className="mt-1 text-xs text-red-600">{headerErrors.regionId || headerErrors.marketOfficeId}</p>
+          {(headerErrors.region || headerErrors.marketOfficeId) && (
+            <p className="mt-1 text-xs text-red-600">{headerErrors.region || headerErrors.marketOfficeId}</p>
           )}
         </div>
       </div>

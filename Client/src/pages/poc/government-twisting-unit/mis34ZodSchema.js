@@ -42,11 +42,9 @@ export const mis34UnitSchema = z.object({
 });
 
 export const mis34HeaderSchema = z.object({
-  regionId: z.union([z.string(), z.number()]).refine((val) => String(val).length > 0, {
-    message: 'Region is required',
-  }),
+  region: z.string().min(1, 'Region is required'),
   marketOfficeId: z.union([z.string(), z.number()]).refine((val) => String(val).length > 0, {
-    message: 'Market Office is required',
+    message: 'Office is required',
   }),
   month: z.string().min(1, 'Month is required'),
   year: z

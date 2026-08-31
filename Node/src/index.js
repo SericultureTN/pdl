@@ -27,6 +27,7 @@ import {
 } from './auth.js';
 import { initReportsSchema, reportsService, isMonthlyReelingType } from './reports.js';
 import { initGovtReelingOfficesSchema, listGovtReelingOffices } from './govtReelingOffices.js';
+import { initGovtTwistingOfficesSchema, listGovtTwistingOffices } from './govtTwistingOffices.js';
 import { buildGovtReelingWorkbook } from './govtReelingExport.js';
 import { getConsolidatedReport } from './govtReelingConsolidated.js';
 import { buildConsolidatedWorkbook } from './govtReelingConsolidatedExport.js';
@@ -346,6 +347,19 @@ app.get("/api/govt-reeling-offices", requireAuth, async (req, res) => {
     return res.json({ ok: true, offices });
   } catch (error) {
     console.error('Get govt reeling offices error:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/govt-twisting-offices -> Government Twisting Unit's own flat
+// office list (independent of both the shared poc_offices hierarchy and
+// Government Reeling Unit's own list — see govtTwistingOffices.js).
+app.get("/api/govt-twisting-offices", requireAuth, async (req, res) => {
+  try {
+    const offices = await listGovtTwistingOffices();
+    return res.json({ ok: true, offices });
+  } catch (error) {
+    console.error('Get govt twisting offices error:', error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -871,6 +885,7 @@ const startServer = async () => {
     await initUsersSchema();
     await initReportsSchema();
     await initGovtReelingOfficesSchema();
+    await initGovtTwistingOfficesSchema();
 
     const schemaInitialized = await initializeDatabase();
     if (!schemaInitialized) {

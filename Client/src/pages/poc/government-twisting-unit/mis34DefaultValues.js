@@ -38,7 +38,7 @@ export function createEmptyUnit() {
 export function createMis34DefaultValues() {
   return {
     header: {
-      regionId: '',
+      region: '',
       marketOfficeId: '',
       adCode: '',
       disCode: '',
