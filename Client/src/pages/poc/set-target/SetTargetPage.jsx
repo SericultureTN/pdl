@@ -6,6 +6,7 @@ import { MONTHS, getFinancialYearKey } from './fiscalYear.js';
 import { getCurrentTarget, listTargets, saveTarget, reviseTarget } from './targetsApi.js';
 import RegionMarketOfficeSelect from '../../../components/RegionMarketOfficeSelect.jsx';
 import GovtReelingOfficeSelect from '../../../components/GovtReelingOfficeSelect.jsx';
+import GovtTwistingOfficeSelect from '../../../components/GovtTwistingOfficeSelect.jsx';
 import FiscalYearMonthPicker, { currentFyStart } from '../../../components/FiscalYearMonthPicker.jsx';
 
 function fyStartFromFiscalYear(fy) {
@@ -20,10 +21,11 @@ const PRIVATE_CATEGORIES = ABSTRACT_UNIT_TYPES.filter((u) => u.sourceCategory);
 // Twisting MIS-34, Private Reeling MIS-40 are government form numbers, not a
 // reference to the MIS section) — Region/Office is locked to POC's hierarchy,
 // no Section picker. All three are annual targets now, keyed by fiscal year:
-// Government Reeling Unit is office-keyed (Region/Office + fiscal year) with
-// a Yearly Target auto-divided ÷12 into monthly D.M on the report (see
-// Client/.../government-reeling-unit/deriveMonthlyFromAnnual.js). Twisting/
-// Private Reeling are unit-code-keyed (fiscal year + Unit Code / Category).
+// Government Reeling Unit and Government Twisting Unit are office-keyed
+// (Region/Office + fiscal year) with a Yearly Target auto-divided ÷12 into
+// monthly D.M on the report (see deriveMonthlyFromAnnual.js in each report
+// type's own folder). Private Reeling is unit-code-keyed (fiscal year +
+// Category).
 const REPORT_TYPES = [
   {
     key: 'government_reeling',
@@ -35,12 +37,8 @@ const REPORT_TYPES = [
   {
     key: 'government_twisting',
     label: 'Government Twisting Unit',
-    unitLabel: 'Unit Code',
-    unitHint: 'Must exactly match the "Unit Code" typed into the report header.',
-    physicalFields: [
-      { key: 'rawProducedTarget', label: 'Raw Produced Target (Kg)' },
-      { key: 'twistedSilkTarget', label: 'Twisted Silk Production Target (Kg)' },
-    ],
+    officeKeyed: true,
+    physicalFields: [{ key: 'twistedSilkTarget', label: 'Twisted Silk Production Target (Kg)' }],
     budgetRows: null,
   },
   {
@@ -53,6 +51,16 @@ const REPORT_TYPES = [
     categorySelect: true,
   },
 ];
+
+// Office-keyed report types each read their own disjoint office table
+// (govt_reeling_offices / govt_twisting_offices) via their own Select
+// component — see RegionMarketOfficeSelect's usage below for the remaining
+// unit-code-keyed type (Private Reeling), which still reads the shared
+// poc_offices hierarchy.
+const OFFICE_SELECT_COMPONENT = {
+  government_reeling: GovtReelingOfficeSelect,
+  government_twisting: GovtTwistingOfficeSelect,
+};
 
 const now = new Date();
 const CURRENT_CALENDAR_YEAR = now.getFullYear();
@@ -328,15 +336,20 @@ export default function SetTargetPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         {officeKeyed ? (
-          <GovtReelingOfficeSelect
-            region={reelingRegion}
-            officeId={officeId}
-            onChange={({ region: nextRegion, officeId: nextOfficeId }) => {
-              setReelingRegion(nextRegion);
-              setOfficeId(nextOfficeId);
-            }}
-            required
-          />
+          (() => {
+            const OfficeSelect = OFFICE_SELECT_COMPONENT[reportTypeKey];
+            return (
+              <OfficeSelect
+                region={reelingRegion}
+                officeId={officeId}
+                onChange={({ region: nextRegion, officeId: nextOfficeId }) => {
+                  setReelingRegion(nextRegion);
+                  setOfficeId(nextOfficeId);
+                }}
+                required
+              />
+            );
+          })()
         ) : (
           <RegionMarketOfficeSelect
             regionId={regionId}
@@ -602,16 +615,21 @@ export default function SetTargetPage() {
         {officeKeyed && (
           <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="sm:col-span-2">
-              <GovtReelingOfficeSelect
-                region={filterRegionId}
-                officeId={filterOfficeId}
-                onChange={({ region, officeId }) => {
-                  setFilterRegionId(region);
-                  setFilterOfficeId(officeId);
-                  if (region || officeId) setFilterAllOffices(false);
-                }}
-                disabled={filterAllOffices}
-              />
+              {(() => {
+                const OfficeSelect = OFFICE_SELECT_COMPONENT[reportTypeKey];
+                return (
+                  <OfficeSelect
+                    region={filterRegionId}
+                    officeId={filterOfficeId}
+                    onChange={({ region, officeId }) => {
+                      setFilterRegionId(region);
+                      setFilterOfficeId(officeId);
+                      if (region || officeId) setFilterAllOffices(false);
+                    }}
+                    disabled={filterAllOffices}
+                  />
+                );
+              })()}
             </div>
             <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
               <input

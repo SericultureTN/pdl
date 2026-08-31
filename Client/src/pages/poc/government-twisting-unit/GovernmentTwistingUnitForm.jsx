@@ -9,10 +9,13 @@ import FiscalYearMonthPicker, {
   currentFyStart,
 } from '../../../components/FiscalYearMonthPicker.jsx';
 import { getFinancialYearKey } from '../set-target/fiscalYear.js';
+import { getCurrentTarget } from '../set-target/targetsApi.js';
+import { deriveMonthlyFromAnnual } from './deriveMonthlyFromAnnual.js';
 import {
   MIS34_REPORT_TITLE,
   MIS34_FORM_CODE,
-  ACHIEVEMENT_TABLE_FIELDS,
+  ACHIEVEMENT_METRIC_LABEL,
+  ACHIEVEMENT_REPORT_FIELDS,
   PRODUCTION_FIELDS,
   PRODUCTION_TABLE_FIELDS,
   NSC_EXPENDITURE_TABLE_FIELDS,
@@ -21,8 +24,8 @@ import {
   ABSTRACT_COLUMNS,
 } from './mis34Constants.js';
 import { createEmptyUnit, createMis34DefaultValues, saveMis34Draft, MIS34_STORAGE_KEY } from './mis34DefaultValues.js';
-import { computeUnitTotals, computeUnitTables, computeAbstract, computeProductionUm } from './mis34Calculations.js';
-import { mis34FormSchema, mis34HeaderSchema, validateUnit } from './mis34ZodSchema.js';
+import { computeUnitTotals, computeUnitTables, computeAbstract, computeProductionUm, computeAchievementUm } from './mis34Calculations.js';
+import { mis34FormSchema, mis34HeaderSchema, mis34AchievementSchema, validateUnit } from './mis34ZodSchema.js';
 import {
   getPeriodKey,
   isReportLocked,
@@ -32,6 +35,27 @@ import {
 } from './mis34MonthRollover.js';
 import { getCurrentReport, saveReportDraft, submitReport } from './reportsApi.js';
 import GovernmentTwistingUnitPrintView from './GovernmentTwistingUnitPrintView.jsx';
+
+/**
+ * Report-level Achievement to Target's Target row is never entered — it's
+ * auto-derived from the Target page's Yearly Target ÷ 12, same mechanism as
+ * Government Reeling Unit's Physical Target (see deriveMonthlyFromAnnual.js).
+ * Only D.M is (re)written here; U.L.M is carried forward separately by the
+ * standard month-end rollover.
+ */
+async function applyCurrentTwistingTarget(header) {
+  if (!header?.marketOfficeId || !header?.month || !header?.year) return null;
+  const fiscalYear = getFinancialYearKey(header.month, header.year);
+  if (!fiscalYear) return null;
+  try {
+    const target = await getCurrentTarget({ unitType: 'government_twisting', officeId: header.marketOfficeId, fiscalYear });
+    if (!target) return null;
+    return deriveMonthlyFromAnnual(target.physicalTarget?.twistedSilkTarget, header.month);
+  } catch (error) {
+    console.error('Failed to fetch twisting target:', error);
+    return null;
+  }
+}
 
 function zodFieldErrors(error) {
   if (!error?.issues) return {};
@@ -181,6 +205,7 @@ function buildRows(fields, data, computedData, groupPath, onFieldChange, errors)
 export default function GovernmentTwistingUnitForm() {
   const initialDraft = useMemo(() => loadMis34ReportForHeader({}), []);
   const [header, setHeader] = useState(initialDraft.header);
+  const [achievementToTarget, setAchievementToTarget] = useState(initialDraft.achievementToTarget);
   const [units, setUnits] = useState(initialDraft.units);
   const [meta, setMeta] = useState(initialDraft.meta);
 
@@ -188,6 +213,7 @@ export default function GovernmentTwistingUnitForm() {
   const [editingUnitId, setEditingUnitId] = useState(null);
   const [entryErrors, setEntryErrors] = useState({});
   const [headerErrors, setHeaderErrors] = useState({});
+  const [achievementErrors, setAchievementErrors] = useState({});
   const [message, setMessage] = useState('');
   const [showPrint, setShowPrint] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -228,7 +254,7 @@ export default function GovernmentTwistingUnitForm() {
 
     const outgoingKey = activePeriodRef.current;
     if (outgoingKey) {
-      saveMis34Report(outgoingKey, { header, units, meta });
+      saveMis34Report(outgoingKey, { header, achievementToTarget, units, meta });
     }
     activePeriodRef.current = nextKey;
 
@@ -248,6 +274,7 @@ export default function GovernmentTwistingUnitForm() {
       if (cancelled) return;
       const loaded = loadMis34ReportForHeader(header);
       setHeader(loaded.header);
+      setAchievementToTarget(loaded.achievementToTarget);
       setUnits(loaded.units);
       setMeta(loaded.meta);
       setMessage(
@@ -258,6 +285,23 @@ export default function GovernmentTwistingUnitForm() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [header.marketOfficeId, header.month, header.year]);
+
+  // Achievement to Target's Target row D.M is always re-derived fresh from
+  // the Target page's Yearly Target ÷ 12 whenever Office/Month/Year changes
+  // — same mechanism as Government Reeling Unit's Physical Target. Runs
+  // independently of (and after) the period-load effect above, since the
+  // fetched target has nothing to do with which local draft was loaded.
+  useEffect(() => {
+    if (!header.marketOfficeId || !header.month || !header.year) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const dm = await applyCurrentTwistingTarget(header);
+      if (!cancelled && dm !== null) {
+        setAchievementToTarget((prev) => ({ ...prev, targetDm: dm }));
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [header.marketOfficeId, header.month, header.year]);
 
   const selectionFyStart = header.month && header.year ? getFyStart(header.month, header.year) : null;
@@ -279,19 +323,24 @@ export default function GovernmentTwistingUnitForm() {
     setEntryUnit((prev) => ({ ...prev, productionDetails: { ...prev.productionDetails, [key]: value } }));
   const handleTableFieldChange = (groupPath, dmKey, value) =>
     setEntryUnit((prev) => ({ ...prev, [groupPath]: { ...prev[groupPath], [dmKey]: value } }));
+  const handleAchievementField = (dmKey, value) =>
+    setAchievementToTarget((prev) => ({ ...prev, [dmKey]: value }));
 
   const computed = computeUnitTotals(entryUnit);
   const tables = computeUnitTables(entryUnit);
   const computedProduction = computeProductionUm(entryUnit.productionDetails);
+  const computedAchievement = computeAchievementUm(achievementToTarget);
 
-  const achievementGroups = useMemo(() => {
-    const byGroup = new Map();
-    ACHIEVEMENT_TABLE_FIELDS.forEach((f) => {
-      if (!byGroup.has(f.group)) byGroup.set(f.group, []);
-      byGroup.get(f.group).push(f);
-    });
-    return Array.from(byGroup.entries());
-  }, []);
+  const achievementRows = ACHIEVEMENT_REPORT_FIELDS.map((f) => ({
+    key: f.key,
+    label: f.label,
+    ulm: achievementToTarget?.[f.ulmKey],
+    dm: achievementToTarget?.[f.dmKey],
+    um: computedAchievement?.[f.umKey],
+    dmEditable: f.dmEditable && !isLocked,
+    onDmChange: (val) => handleAchievementField(f.dmKey, val),
+    dmError: achievementErrors[f.dmKey],
+  }));
 
   const nscRows = [
     ...buildRows(NSC_EXPENDITURE_TABLE_FIELDS, entryUnit.nscExpenditure, tables.nscExpenditure, 'nscExpenditure', handleTableFieldChange, entryErrors),
@@ -328,11 +377,11 @@ export default function GovernmentTwistingUnitForm() {
     },
   ];
 
-  const persistLocalDraft = (nextUnits, nextMeta, nextHeader = header) => {
-    saveMis34Draft({ header: nextHeader, units: nextUnits, meta: nextMeta });
+  const persistLocalDraft = (nextUnits, nextMeta, nextHeader = header, nextAchievement = achievementToTarget) => {
+    saveMis34Draft({ header: nextHeader, achievementToTarget: nextAchievement, units: nextUnits, meta: nextMeta });
     const periodKey = getPeriodKey(nextHeader);
     if (periodKey && !isReportLocked(nextMeta)) {
-      saveMis34Report(periodKey, { header: nextHeader, units: nextUnits, meta: nextMeta });
+      saveMis34Report(periodKey, { header: nextHeader, achievementToTarget: nextAchievement, units: nextUnits, meta: nextMeta });
     }
   };
 
@@ -387,13 +436,13 @@ export default function GovernmentTwistingUnitForm() {
     return true;
   };
 
-  const persistToServer = async (targetHeader, targetUnits, nextMeta) => {
+  const persistToServer = async (targetHeader, targetAchievement, targetUnits, nextMeta) => {
     const fiscalYear = getFinancialYearKey(targetHeader.month, targetHeader.year);
     const saved = await saveReportDraft({
       officeId: targetHeader.marketOfficeId,
       fiscalYear,
       month: targetHeader.month,
-      data: { header: targetHeader, units: targetUnits, meta: nextMeta },
+      data: { header: targetHeader, achievementToTarget: targetAchievement, units: targetUnits, meta: nextMeta },
     });
     return saved;
   };
@@ -414,7 +463,7 @@ export default function GovernmentTwistingUnitForm() {
 
     setSaving(true);
     try {
-      await persistToServer(header, units, meta);
+      await persistToServer(header, achievementToTarget, units, meta);
       persistLocalDraft(units, meta);
       setMessage('Report saved as draft.');
     } catch (error) {
@@ -435,7 +484,15 @@ export default function GovernmentTwistingUnitForm() {
       return;
     }
 
-    const formResult = mis34FormSchema.safeParse({ header, units });
+    const achievementResult = mis34AchievementSchema.safeParse(achievementToTarget);
+    if (!achievementResult.success) {
+      setAchievementErrors(zodFieldErrors(achievementResult.error));
+      setMessage('Fix validation errors in Achievement to Target before submitting.');
+      return;
+    }
+    setAchievementErrors({});
+
+    const formResult = mis34FormSchema.safeParse({ header, achievementToTarget, units });
     if (!formResult.success) {
       setMessage('Resolve all validation errors before submitting — check each unit and add at least one.');
       return;
@@ -449,7 +506,7 @@ export default function GovernmentTwistingUnitForm() {
       /* session unavailable in POC */
     }
 
-    const result = submitMis34ReportWithRollover({ header, units, meta }, submittedBy);
+    const result = submitMis34ReportWithRollover({ header, achievementToTarget, units, meta }, submittedBy);
     if (!result.ok) {
       setMessage(result.error);
       return;
@@ -457,11 +514,21 @@ export default function GovernmentTwistingUnitForm() {
 
     setSaving(true);
     try {
-      const saved = await persistToServer(result.submittedReport.header, result.submittedReport.units, result.submittedReport.meta);
+      const saved = await persistToServer(
+        result.submittedReport.header,
+        result.submittedReport.achievementToTarget,
+        result.submittedReport.units,
+        result.submittedReport.meta
+      );
       await submitReport(saved.id);
 
       if (result.nextDraft) {
-        await persistToServer(result.nextDraft.header, result.nextDraft.units, result.nextDraft.meta);
+        await persistToServer(
+          result.nextDraft.header,
+          result.nextDraft.achievementToTarget,
+          result.nextDraft.units,
+          result.nextDraft.meta
+        );
       }
 
       // Move straight to next month's (carried U.L.M, blank D.M) draft rather
@@ -472,6 +539,7 @@ export default function GovernmentTwistingUnitForm() {
       };
       skipPeriodSwitchRef.current = true;
       setHeader(freshDraft.header);
+      setAchievementToTarget(freshDraft.achievementToTarget);
       setUnits(freshDraft.units);
       setMeta(freshDraft.meta);
       setEntryUnit(createEmptyUnit());
@@ -497,6 +565,7 @@ export default function GovernmentTwistingUnitForm() {
     return (
       <GovernmentTwistingUnitPrintView
         header={header}
+        achievementToTarget={achievementToTarget}
         units={units}
         onClose={() => setShowPrint(false)}
       />
@@ -583,6 +652,15 @@ export default function GovernmentTwistingUnitForm() {
         </div>
       </div>
 
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-1 text-base font-semibold text-emerald-secondary">Achievement to Target</h3>
+        <p className="mb-3 text-xs text-slate-500">
+          Office-wide, not per unit. Target row is read-only — D.M is auto-derived from the Target page's
+          Yearly Target ÷ 12 for {ACHIEVEMENT_METRIC_LABEL}. Achieved D.M is the only editable cell.
+        </p>
+        <DataTable title={ACHIEVEMENT_METRIC_LABEL} rows={achievementRows} />
+      </div>
+
       {message && (
         <div className={clsx('rounded-lg px-4 py-3 text-sm', isLocked ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800')}>
           {message}
@@ -637,16 +715,6 @@ export default function GovernmentTwistingUnitForm() {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </label>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-            {achievementGroups.map(([groupName, groupFields]) => (
-              <DataTable
-                key={groupName}
-                title={`Achievement to Target — ${groupName}`}
-                rows={buildRows(groupFields, entryUnit.achievementToTarget, tables.achievementToTarget, 'achievementToTarget', handleTableFieldChange, entryErrors)}
-              />
-            ))}
           </div>
 
           <div className="mt-4">

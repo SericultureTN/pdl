@@ -1,14 +1,15 @@
 import {
   MIS34_REPORT_TITLE,
   MIS34_FORM_CODE,
-  ACHIEVEMENT_TABLE_FIELDS,
+  ACHIEVEMENT_METRIC_LABEL,
+  ACHIEVEMENT_REPORT_FIELDS,
   PRODUCTION_FIELDS,
   PRODUCTION_TABLE_FIELDS,
   NSC_EXPENDITURE_TABLE_FIELDS,
   COST_SALE_TABLE_FIELDS,
   ABSTRACT_COLUMNS,
 } from './mis34Constants.js';
-import { computeUnitTotals, computeUnitTables, computeAbstract } from './mis34Calculations.js';
+import { computeUnitTotals, computeUnitTables, computeAbstract, computeAchievementUm } from './mis34Calculations.js';
 
 function cell(val) {
   return val === '' || val == null ? '—' : val;
@@ -54,14 +55,6 @@ function UnitPrintCard({ unit, index }) {
   const totals = computeUnitTotals(unit);
   const tables = computeUnitTables(unit);
 
-  const achievementGroups = [];
-  const byGroup = new Map();
-  ACHIEVEMENT_TABLE_FIELDS.forEach((f) => {
-    if (!byGroup.has(f.group)) byGroup.set(f.group, []);
-    byGroup.get(f.group).push(f);
-  });
-  byGroup.forEach((fields, groupName) => achievementGroups.push({ groupName, fields }));
-
   const nscRows = [
     ...buildRows(NSC_EXPENDITURE_TABLE_FIELDS, unit.nscExpenditure, tables.nscExpenditure),
     { key: 'nscTotal', label: 'TOTAL', ulm: totals.nscTotal.ulm, dm: totals.nscTotal.dm, um: totals.nscTotal.um, emphasis: true },
@@ -78,14 +71,6 @@ function UnitPrintCard({ unit, index }) {
       <h3 className="mb-2 border-b border-slate-400 pb-1 text-sm font-bold">
         {index + 1}. {unit.unitName || '(unnamed unit)'} {unit.unitCode ? `(${unit.unitCode})` : ''}
       </h3>
-
-      {achievementGroups.map(({ groupName, fields }) => (
-        <DataTablePrint
-          key={groupName}
-          title={`Achievement to Target — ${groupName}`}
-          rows={buildRows(fields, unit.achievementToTarget, tables.achievementToTarget)}
-        />
-      ))}
 
       <table className="mb-2 w-full border-collapse text-[10px]">
         <thead>
@@ -115,10 +100,12 @@ function UnitPrintCard({ unit, index }) {
   );
 }
 
-export default function GovernmentTwistingUnitPrintView({ header, units, onClose }) {
+export default function GovernmentTwistingUnitPrintView({ header, achievementToTarget, units, onClose }) {
   const safeHeader = header || {};
   const safeUnits = Array.isArray(units) ? units : [];
   const abstractRows = computeAbstract(safeUnits);
+  const computedAchievement = computeAchievementUm(achievementToTarget || {});
+  const achievementRows = buildRows(ACHIEVEMENT_REPORT_FIELDS, achievementToTarget, computedAchievement);
 
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-6">
@@ -140,7 +127,10 @@ export default function GovernmentTwistingUnitPrintView({ header, units, onClose
           </p>
         </div>
 
-        <h2 className="mb-3 border-b-2 border-emerald-primary pb-1 text-base font-bold">Twisting Units ({safeUnits.length})</h2>
+        <h2 className="mb-3 border-b-2 border-emerald-primary pb-1 text-base font-bold">Achievement to Target (Office-wide)</h2>
+        <DataTablePrint title={ACHIEVEMENT_METRIC_LABEL} rows={achievementRows} />
+
+        <h2 className="mb-3 mt-6 border-b-2 border-emerald-primary pb-1 text-base font-bold">Twisting Units ({safeUnits.length})</h2>
         {safeUnits.length === 0 ? (
           <p className="text-sm text-slate-500">No units added.</p>
         ) : (

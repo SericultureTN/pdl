@@ -433,27 +433,30 @@ function toTargetPayload(row) {
   };
 }
 
-// office_id means govt_reeling_offices(id) for government_reeling targets
-// but poc_offices(id) for private_reeling/government_twisting — two
-// disjoint tables, so the join must be type-conditional (a single
-// unconditional join would silently show wrong/missing region+office data
-// for whichever type it wasn't written for). region_id is a region NAME
-// (text) for government_reeling since govt_reeling_offices has no separate
-// regions table, but stays the numeric group_id for the other two.
+// office_id means govt_reeling_offices(id) for government_reeling targets,
+// govt_twisting_offices(id) for government_twisting, and poc_offices(id)
+// for private_reeling — three disjoint tables, so the join must be
+// type-conditional (a single unconditional join would silently show
+// wrong/missing region+office data for whichever type it wasn't written
+// for). region_id is a region NAME (text) for government_reeling/
+// government_twisting since neither office table has a separate regions
+// table, but stays the numeric group_id for private_reeling.
 const TARGETS_WITH_REGION_SELECT = `
   SELECT t.*,
-    COALESCE(gro.region, mo.group_id::text) AS region_id,
-    COALESCE(gro.name, mo.name) AS office_name
+    COALESCE(gro.region, gto.region, mo.group_id::text) AS region_id,
+    COALESCE(gro.name, gto.name, mo.name) AS office_name
   FROM poc_targets t
   LEFT JOIN govt_reeling_offices gro ON gro.id = t.office_id AND t.unit_type = 'government_reeling'
-  LEFT JOIN poc_offices mo ON mo.id = t.office_id AND t.unit_type <> 'government_reeling'
+  LEFT JOIN govt_twisting_offices gto ON gto.id = t.office_id AND t.unit_type = 'government_twisting'
+  LEFT JOIN poc_offices mo ON mo.id = t.office_id AND t.unit_type NOT IN ('government_reeling', 'government_twisting')
 `;
 
-// government_reeling is office-keyed (office_id + fiscal_year); twisting/
-// private_reeling are unit-code-keyed (unit_code + fiscal_year). All three
-// are annual now — a single Yearly Target/Budget Annual per fiscal year,
-// auto-divided ÷12 into monthly D.M client-side (deriveMonthlyFromAnnual.js).
-const OFFICE_KEYED_TARGET_TYPES = new Set(['government_reeling']);
+// government_reeling and government_twisting are office-keyed (office_id +
+// fiscal_year); private_reeling is unit-code-keyed (unit_code +
+// fiscal_year). All three are annual now — a single Yearly Target/Budget
+// Annual per fiscal year, auto-divided ÷12 into monthly D.M client-side
+// (deriveMonthlyFromAnnual.js).
+const OFFICE_KEYED_TARGET_TYPES = new Set(['government_reeling', 'government_twisting']);
 
 // GET /api/targets?unitType=&unitCode=&fiscalYear=              -> current target for one unit (unit-code-keyed types)
 // GET /api/targets?unitType=government_reeling&officeId=&fiscalYear= -> current target for one office (office-keyed)

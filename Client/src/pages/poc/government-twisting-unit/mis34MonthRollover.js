@@ -1,4 +1,4 @@
-import { MONTHS, UNIT_TABLE_GROUPS } from './mis34Constants.js';
+import { MONTHS, UNIT_TABLE_GROUPS, ACHIEVEMENT_REPORT_FIELDS } from './mis34Constants.js';
 import { createEmptyUnit, createMis34DefaultValues, mergeMis34StoredReport } from './mis34DefaultValues.js';
 import { getFinancialYearKey } from '../set-target/fiscalYear.js';
 
@@ -95,6 +95,25 @@ function round2(value) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Report-level Achievement to Target carry-forward — this month's U.M for
+ * Target and Achieved both become next month's U.L.M. (Target's D.M is
+ * re-derived fresh from the Target page's Yearly Target ÷ 12 every time the
+ * form loads a period, independent of this carry-forward; only its U.L.M
+ * running-cumulative comes from here.)
+ */
+function extractAchievementCarryForward(achievementToTarget) {
+  const carry = {};
+  ACHIEVEMENT_REPORT_FIELDS.forEach(({ ulmKey, dmKey }) => {
+    carry[ulmKey] = round2(num(achievementToTarget?.[ulmKey]) + num(achievementToTarget?.[dmKey]));
+  });
+  return carry;
+}
+
+function buildNextAchievementToTarget(carry, existing) {
+  return { ...(existing || {}), ...carry };
+}
+
 /** Builds next month's pre-populated units — same unit names, U.L.M carried, D.M/U.M blank. */
 function buildNextUnits(carryMap, existingUnits = []) {
   const existingByName = {};
@@ -146,6 +165,10 @@ export function loadMis34ReportForHeader(header) {
   if (priorSubmitted) {
     const carryMap = extractCarryForwardFromUnits(priorSubmitted.units);
     report.units = buildNextUnits(carryMap, []);
+    report.achievementToTarget = buildNextAchievementToTarget(
+      extractAchievementCarryForward(priorSubmitted.achievementToTarget),
+      report.achievementToTarget
+    );
     report.meta = {
       ...report.meta,
       ulmCarriedFrom: getPeriodKey(priorSubmitted.header),
@@ -206,6 +229,10 @@ export function submitMis34ReportWithRollover(report, submittedBy = 'unknown') {
 
   const carryMap = extractCarryForwardFromUnits(submittedReport.units);
   nextDraft.units = buildNextUnits(carryMap, nextDraft.units || []);
+  nextDraft.achievementToTarget = buildNextAchievementToTarget(
+    extractAchievementCarryForward(submittedReport.achievementToTarget),
+    nextDraft.achievementToTarget
+  );
 
   nextDraft.meta = {
     ...nextDraft.meta,

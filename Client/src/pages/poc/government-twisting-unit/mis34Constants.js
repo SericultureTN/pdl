@@ -14,27 +14,31 @@ export const HEADER_FIELDS = [
   { key: 'regCode', label: 'REG Code', type: 'text' },
 ];
 
+/** Single metric this section tracks — office-wide, not per-unit (see ACHIEVEMENT_REPORT_FIELDS). */
+export const ACHIEVEMENT_METRIC_LABEL = 'Twisted Silk Production (Kg)';
+
 /**
- * Achievement to Target — two tables (Raw Produced, Twisted Silk Production),
- * each with a Target row and an Achieved row, U.L.M/D.M/U.M columns.
- * U.L.M is carried forward at month-end rollover like every other table row.
+ * Achievement to Target — REPORT-LEVEL, not per-unit: the Target page sets
+ * one Yearly Target per Office (same office-keyed mechanism as Government
+ * Reeling Unit's Physical Target), so this section appears once per report,
+ * above the unit list, not duplicated inside each Twisting Unit.
+ *
+ * Target row: fully read-only. D.M is auto-derived every time the report's
+ * Office/Month/Year changes, from the Target page's Yearly Target ÷ 12 (see
+ * deriveMonthlyFromAnnual.js) — never entered directly. U.L.M carries
+ * forward from last month's U.M at month-end rollover like every other row.
+ *
+ * Achieved row: U.L.M carries forward the same way; D.M is the only
+ * manually editable cell in this entire section; U.M = U.L.M + D.M.
  */
-export const ACHIEVEMENT_TABLE_FIELDS = [
+export const ACHIEVEMENT_REPORT_FIELDS = [
   {
-    key: 'targetRawProduced', label: 'Target', group: 'Raw Produced (Kg)',
-    ulmKey: 'targetRawProducedUlm', dmKey: 'targetRawProducedDm', umKey: 'targetRawProducedUm',
+    key: 'target', label: 'Target', dmEditable: false,
+    ulmKey: 'targetUlm', dmKey: 'targetDm', umKey: 'targetUm',
   },
   {
-    key: 'achievedRawProduced', label: 'Achieved', group: 'Raw Produced (Kg)',
-    ulmKey: 'achievedRawProducedUlm', dmKey: 'achievedRawProducedDm', umKey: 'achievedRawProducedUm',
-  },
-  {
-    key: 'targetTwistedSilkProduction', label: 'Target', group: 'Twisted Silk Production (Kg)',
-    ulmKey: 'targetTwistedSilkProductionUlm', dmKey: 'targetTwistedSilkProductionDm', umKey: 'targetTwistedSilkProductionUm',
-  },
-  {
-    key: 'achievedTwistedSilkProduction', label: 'Achieved', group: 'Twisted Silk Production (Kg)',
-    ulmKey: 'achievedTwistedSilkProductionUlm', dmKey: 'achievedTwistedSilkProductionDm', umKey: 'achievedTwistedSilkProductionUm',
+    key: 'achieved', label: 'Achieved', dmEditable: true,
+    ulmKey: 'achievedUlm', dmKey: 'achievedDm', umKey: 'achievedUm',
   },
 ];
 
@@ -124,7 +128,6 @@ export const COST_SALE_TABLE_FIELDS = [
 
 /** Every table-shaped group on a unit — used generically by rollover, defaults, and zod. */
 export const UNIT_TABLE_GROUPS = [
-  { path: 'achievementToTarget', fields: ACHIEVEMENT_TABLE_FIELDS },
   { path: 'productionDetails', fields: PRODUCTION_TABLE_FIELDS },
   { path: 'nscExpenditure', fields: NSC_EXPENDITURE_TABLE_FIELDS },
   { path: 'costSaleValue', fields: COST_SALE_TABLE_FIELDS },

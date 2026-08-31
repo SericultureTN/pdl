@@ -3,6 +3,7 @@ import {
   NSC_EXPENDITURE_TABLE_FIELDS,
   COST_SALE_TABLE_FIELDS,
   PRODUCTION_TABLE_FIELDS,
+  ACHIEVEMENT_REPORT_FIELDS,
 } from './mis34Constants.js';
 
 function num(value) {
@@ -25,6 +26,11 @@ export function computeTableUm(data, fields) {
 
 export function computeProductionUm(productionDetails) {
   return computeTableUm(productionDetails, PRODUCTION_TABLE_FIELDS);
+}
+
+/** Report-level Achievement to Target (Target/Achieved rows) — not per-unit. */
+export function computeAchievementUm(achievementToTarget) {
+  return computeTableUm(achievementToTarget, ACHIEVEMENT_REPORT_FIELDS);
 }
 
 /** Recomputes every U.L.M/D.M/U.M group on a unit — used before persisting/rolling over. */

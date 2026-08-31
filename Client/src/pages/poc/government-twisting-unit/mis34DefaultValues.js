@@ -1,5 +1,5 @@
 import { createUnitId } from './mis34Calculations.js';
-import { PRODUCTION_FIELDS, UNIT_TABLE_GROUPS } from './mis34Constants.js';
+import { PRODUCTION_FIELDS, UNIT_TABLE_GROUPS, ACHIEVEMENT_REPORT_FIELDS } from './mis34Constants.js';
 
 function buildSimpleFields(fields) {
   return Object.fromEntries(fields.map((f) => [f.key, '']));
@@ -14,6 +14,11 @@ function buildTableFields(fields) {
     data[umKey] = '';
   });
   return data;
+}
+
+/** Report-level Achievement to Target (Target/Achieved) — not per-unit. */
+function buildAchievementToTarget() {
+  return buildTableFields(ACHIEVEMENT_REPORT_FIELDS);
 }
 
 function buildProductionDetails() {
@@ -46,6 +51,7 @@ export function createMis34DefaultValues() {
       month: '',
       year: '',
     },
+    achievementToTarget: buildAchievementToTarget(),
     units: [],
     meta: {
       status: 'draft',
@@ -77,6 +83,7 @@ export function mergeMis34StoredReport(parsed) {
     ...defaults,
     ...parsed,
     header: { ...defaults.header, ...(parsed?.header || {}) },
+    achievementToTarget: { ...defaults.achievementToTarget, ...(parsed?.achievementToTarget || {}) },
     units: Array.isArray(parsed?.units) ? parsed.units.map(mergeUnit) : [],
     meta: { ...defaults.meta, ...(parsed?.meta || {}) },
   };

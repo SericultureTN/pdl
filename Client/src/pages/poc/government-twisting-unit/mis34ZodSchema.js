@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UNIT_TABLE_GROUPS } from './mis34Constants.js';
+import { UNIT_TABLE_GROUPS, ACHIEVEMENT_REPORT_FIELDS } from './mis34Constants.js';
 
 const nonNegativeNumber = z
   .union([z.string(), z.number()])
@@ -54,8 +54,12 @@ export const mis34HeaderSchema = z.object({
     }),
 });
 
+/** Report-level Achievement to Target (Target/Achieved rows) — not per-unit. */
+export const mis34AchievementSchema = z.object(tableShape(ACHIEVEMENT_REPORT_FIELDS));
+
 export const mis34FormSchema = z.object({
   header: mis34HeaderSchema,
+  achievementToTarget: mis34AchievementSchema,
   units: z.array(mis34UnitSchema).min(1, 'Add at least one twisting unit'),
 });
 
