@@ -2,20 +2,16 @@ import {
   MIS34_REPORT_TITLE,
   MIS34_FORM_CODE,
   ACHIEVEMENT_METRIC_LABEL,
-  ACHIEVEMENT_REPORT_FIELDS,
   PRODUCTION_FIELDS,
-  PRODUCTION_TABLE_FIELDS,
-  NSC_EXPENDITURE_TABLE_FIELDS,
-  COST_SALE_TABLE_FIELDS,
+  UNIT_TABLE_GROUPS,
   ABSTRACT_COLUMNS,
 } from './mis34Constants.js';
-import { computeUnitTotals, computeUnitTables, computeAbstract, computeAchievementUm } from './mis34Calculations.js';
 
 function cell(val) {
   return val === '' || val == null ? '—' : val;
 }
 
-/** Print-format U.L.M/D.M/U.M table — mirrors the on-screen DataTable. */
+/** Print-format U.L.M/D.M/U.M table. */
 function DataTablePrint({ title, rows }) {
   return (
     <table className="mb-2 w-full border-collapse text-[10px]">
@@ -41,29 +37,23 @@ function DataTablePrint({ title, rows }) {
   );
 }
 
-function buildRows(fields, data, computedData) {
-  return fields.map((f) => ({
-    key: f.key,
-    label: f.label,
-    ulm: data?.[f.ulmKey],
-    dm: data?.[f.dmKey],
-    um: computedData?.[f.umKey],
-  }));
+function unitToRows(fields, unit) {
+  return fields.map((f) => ({ key: f.key, label: f.label, ...unit[f.key] }));
 }
 
 function UnitPrintCard({ unit, index }) {
-  const totals = computeUnitTotals(unit);
-  const tables = computeUnitTables(unit);
+  const nscFields = UNIT_TABLE_GROUPS.find((g) => g.path === 'nscExpenditure').fields;
+  const costSaleFields = UNIT_TABLE_GROUPS.find((g) => g.path === 'costSaleValue').fields;
+  const productionFields = UNIT_TABLE_GROUPS.find((g) => g.path === 'productionDetails').fields;
 
   const nscRows = [
-    ...buildRows(NSC_EXPENDITURE_TABLE_FIELDS, unit.nscExpenditure, tables.nscExpenditure),
-    { key: 'nscTotal', label: 'TOTAL', ulm: totals.nscTotal.ulm, dm: totals.nscTotal.dm, um: totals.nscTotal.um, emphasis: true },
+    ...unitToRows(nscFields, unit),
+    { key: 'nscTotal', label: 'TOTAL', ...unit.totals.nscTotal, emphasis: true },
   ];
-
   const costSaleRows = [
-    ...buildRows(COST_SALE_TABLE_FIELDS, unit.costSaleValue, tables.costSaleValue),
-    { key: 'netExpenditure', label: 'Net Expenditure (Rs)', ulm: undefined, dm: totals.netExpenditure.dm, um: totals.netExpenditure.um, emphasis: true },
-    { key: 'costOfProductionPerKg', label: 'Cost of Production per Kg (Rs)', ulm: undefined, dm: totals.costOfProductionPerKg.dm, um: totals.costOfProductionPerKg.um, emphasis: true },
+    ...unitToRows(costSaleFields, unit),
+    { key: 'netExpenditure', label: 'Net Expenditure (Rs)', ulm: undefined, ...unit.totals.netExpenditure, emphasis: true },
+    { key: 'costOfProductionPerKg', label: 'Cost of Production per Kg (Rs)', ulm: undefined, ...unit.totals.costOfProductionPerKg, emphasis: true },
   ];
 
   return (
@@ -85,27 +75,29 @@ function UnitPrintCard({ unit, index }) {
           <tr>
             <td className="border border-slate-200 px-1 py-0.5" />
             {PRODUCTION_FIELDS.map((f) => (
-              <td key={f.key} className="border border-slate-200 px-1 py-0.5">
-                {unit.productionDetails?.[f.key] || '—'}
-              </td>
+              <td key={f.key} className="border border-slate-200 px-1 py-0.5">{unit[f.key] || '—'}</td>
             ))}
           </tr>
         </tbody>
       </table>
 
-      <DataTablePrint title="Production Details" rows={buildRows(PRODUCTION_TABLE_FIELDS, unit.productionDetails, tables.productionDetails)} />
+      <DataTablePrint title="Production Details" rows={unitToRows(productionFields, unit)} />
       <DataTablePrint title="NSC Expenditure" rows={nscRows} />
       <DataTablePrint title="Cost & Sale Value" rows={costSaleRows} />
     </div>
   );
 }
 
-export default function GovernmentTwistingUnitPrintView({ header, achievementToTarget, units, onClose }) {
+export default function GovernmentTwistingUnitPrintView({ header, achievement, units, abstractData, onClose }) {
   const safeHeader = header || {};
   const safeUnits = Array.isArray(units) ? units : [];
-  const abstractRows = computeAbstract(safeUnits);
-  const computedAchievement = computeAchievementUm(achievementToTarget || {});
-  const achievementRows = buildRows(ACHIEVEMENT_REPORT_FIELDS, achievementToTarget, computedAchievement);
+  const rows = abstractData?.rows || [];
+  const grandTotal = abstractData?.grandTotal;
+
+  const achievementRows = [
+    { key: 'target', label: 'Target', ...achievement.target },
+    { key: 'achieved', label: 'Achieved', ...achievement.achieved },
+  ];
 
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-6">
@@ -147,8 +139,8 @@ export default function GovernmentTwistingUnitPrintView({ header, achievementToT
             </tr>
           </thead>
           <tbody>
-            {abstractRows.map((row) => (
-              <tr key={row.key} className={row.isGrandTotal ? 'bg-amber-50 font-bold' : undefined}>
+            {rows.map((row) => (
+              <tr key={row.id}>
                 {ABSTRACT_COLUMNS.map((col) => (
                   <td key={col.id} className="border border-slate-200 px-1 py-0.5">
                     {row[col.id] === '' || row[col.id] == null ? '—' : row[col.id]}
@@ -156,6 +148,15 @@ export default function GovernmentTwistingUnitPrintView({ header, achievementToT
                 ))}
               </tr>
             ))}
+            {grandTotal && (
+              <tr className="bg-amber-50 font-bold">
+                {ABSTRACT_COLUMNS.map((col) => (
+                  <td key={col.id} className="border border-slate-200 px-1 py-0.5">
+                    {grandTotal[col.id] === '' || grandTotal[col.id] == null ? '—' : grandTotal[col.id]}
+                  </td>
+                ))}
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

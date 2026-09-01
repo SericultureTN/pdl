@@ -9,52 +9,37 @@ import FiscalYearMonthPicker, {
   currentFyStart,
 } from '../../../components/FiscalYearMonthPicker.jsx';
 import { getFinancialYearKey } from '../set-target/fiscalYear.js';
-import { getCurrentTarget } from '../set-target/targetsApi.js';
-import { deriveMonthlyFromAnnual } from './deriveMonthlyFromAnnual.js';
 import {
   MIS34_REPORT_TITLE,
   MIS34_FORM_CODE,
   ACHIEVEMENT_METRIC_LABEL,
-  ACHIEVEMENT_REPORT_FIELDS,
   PRODUCTION_FIELDS,
-  PRODUCTION_TABLE_FIELDS,
-  NSC_EXPENDITURE_TABLE_FIELDS,
-  COST_SALE_TABLE_FIELDS,
+  UNIT_TABLE_GROUPS,
   LIST_COLUMNS,
   ABSTRACT_COLUMNS,
 } from './mis34Constants.js';
-import { createEmptyUnit, createMis34DefaultValues, saveMis34Draft, MIS34_STORAGE_KEY } from './mis34DefaultValues.js';
-import { computeUnitTotals, computeUnitTables, computeAbstract, computeProductionUm, computeAchievementUm } from './mis34Calculations.js';
-import { mis34FormSchema, mis34HeaderSchema, mis34AchievementSchema, validateUnit } from './mis34ZodSchema.js';
+import { createEmptyUnit, createMis34DefaultValues } from './mis34DefaultValues.js';
+import { validateUnit } from './mis34ZodSchema.js';
+import { getCurrentReport, saveReportDraft } from './reportsApi.js';
 import {
-  getPeriodKey,
-  isReportLocked,
-  loadMis34ReportForHeader,
-  saveMis34Report,
-  submitMis34ReportWithRollover,
-} from './mis34MonthRollover.js';
-import { getCurrentReport, saveReportDraft, submitReport } from './reportsApi.js';
+  getFullTwistingReport,
+  saveTwistingAchievement,
+  createTwistingUnit,
+  updateTwistingUnit,
+  deleteTwistingUnit,
+  submitTwistingReport,
+} from './twistingReportApi.js';
 import GovernmentTwistingUnitPrintView from './GovernmentTwistingUnitPrintView.jsx';
 
-/**
- * Report-level Achievement to Target's Target row is never entered — it's
- * auto-derived from the Target page's Yearly Target ÷ 12, same mechanism as
- * Government Reeling Unit's Physical Target (see deriveMonthlyFromAnnual.js).
- * Only D.M is (re)written here; U.L.M is carried forward separately by the
- * standard month-end rollover.
- */
-async function applyCurrentTwistingTarget(header) {
-  if (!header?.marketOfficeId || !header?.month || !header?.year) return null;
-  const fiscalYear = getFinancialYearKey(header.month, header.year);
-  if (!fiscalYear) return null;
-  try {
-    const target = await getCurrentTarget({ unitType: 'government_twisting', officeId: header.marketOfficeId, fiscalYear });
-    if (!target) return null;
-    return deriveMonthlyFromAnnual(target.physicalTarget?.twistedSilkTarget, header.month);
-  } catch (error) {
-    console.error('Failed to fetch twisting target:', error);
-    return null;
-  }
+const CALENDAR_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function nextCalendarPeriod(month, year) {
+  const idx = CALENDAR_MONTHS.indexOf(month);
+  if (idx === -1) return null;
+  return idx === 11 ? { month: 'January', year: Number(year) + 1 } : { month: CALENDAR_MONTHS[idx + 1], year: Number(year) };
 }
 
 function zodFieldErrors(error) {
@@ -64,6 +49,43 @@ function zodFieldErrors(error) {
     map[issue.path[issue.path.length - 1]] = issue.message;
   });
   return map;
+}
+
+/** Server unit (flat, {fieldKey: {ulm,dm,um}}) -> the nested shape the entry-form/mis34* helpers already use. */
+function serverUnitToEntry(serverUnit) {
+  const entry = createEmptyUnit();
+  entry.id = String(serverUnit.id);
+  entry.unitName = serverUnit.unitName || '';
+  entry.unitCode = serverUnit.unitCode || '';
+  entry.productionDetails.spindlesInstalled = serverUnit.spindlesInstalled ?? '';
+  entry.productionDetails.installedProductionCapacity = serverUnit.installedProductionCapacity ?? '';
+  entry.productionDetails.spindlesInUse = serverUnit.spindlesInUse ?? '';
+  UNIT_TABLE_GROUPS.forEach(({ path, fields }) => {
+    fields.forEach((f) => {
+      const triple = serverUnit[f.key] || {};
+      entry[path][f.ulmKey] = triple.ulm ?? 0;
+      entry[path][f.dmKey] = triple.dm ?? '';
+      entry[path][f.umKey] = triple.um ?? '';
+    });
+  });
+  return entry;
+}
+
+/** Entry-form draft -> the flat body the twisting-units API expects (D.M + plain fields only — U.L.M/U.M are server-managed). */
+function entryUnitToServerPayload(entryUnit) {
+  const payload = {
+    unitName: entryUnit.unitName,
+    unitCode: entryUnit.unitCode,
+    spindlesInstalled: entryUnit.productionDetails.spindlesInstalled,
+    installedProductionCapacity: entryUnit.productionDetails.installedProductionCapacity,
+    spindlesInUse: entryUnit.productionDetails.spindlesInUse,
+  };
+  UNIT_TABLE_GROUPS.forEach(({ path, fields }) => {
+    fields.forEach((f) => {
+      payload[`${f.key}Dm`] = entryUnit[path][f.dmKey];
+    });
+  });
+  return payload;
 }
 
 function NumberField({ label, value, onChange, error, readOnly, computed }) {
@@ -119,8 +141,7 @@ const cell = (val) => (val === '' || val == null ? 0 : val);
 /**
  * Generic U.L.M / D.M / U.M table — same styling used across Government Reeling
  * Unit / Private Reeling. `rows` is a flat list of { key, label, ulm, dm, um,
- * dmEditable, onDmChange, dmError, indent, emphasis }. Rows with dmEditable:false
- * and no onDmChange render every column read-only (TOTAL / calculated rows).
+ * dmEditable, onDmChange, dmError, emphasis }.
  */
 function DataTable({ title, rows }) {
   return (
@@ -139,9 +160,7 @@ function DataTable({ title, rows }) {
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} className={row.emphasis ? 'bg-amber-50 font-semibold' : undefined}>
-                <td className={clsx('border border-slate-200 px-3 py-2 text-slate-700', row.indent && 'pl-6 font-normal')}>
-                  {row.label}
-                </td>
+                <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.label}</td>
                 <td className="border border-slate-200 px-2 py-1">
                   <input
                     type="text"
@@ -202,29 +221,30 @@ function buildRows(fields, data, computedData, groupPath, onFieldChange, errors)
   }));
 }
 
+const emptyAchievement = { target: { ulm: 0, dm: 0, um: 0 }, achieved: { ulm: 0, dm: 0, um: 0 } };
+
 export default function GovernmentTwistingUnitForm() {
-  const initialDraft = useMemo(() => loadMis34ReportForHeader({}), []);
-  const [header, setHeader] = useState(initialDraft.header);
-  const [achievementToTarget, setAchievementToTarget] = useState(initialDraft.achievementToTarget);
-  const [units, setUnits] = useState(initialDraft.units);
-  const [meta, setMeta] = useState(initialDraft.meta);
+  const [header, setHeader] = useState(createMis34DefaultValues().header);
+  const [reportId, setReportId] = useState(null);
+  const [reportMeta, setReportMeta] = useState({ status: 'draft', submittedAt: null });
+  const [achievement, setAchievement] = useState(emptyAchievement);
+  const [units, setUnits] = useState([]);
+  const [abstractData, setAbstractData] = useState({ rows: [], grandTotal: null });
 
   const [entryUnit, setEntryUnit] = useState(createEmptyUnit());
   const [editingUnitId, setEditingUnitId] = useState(null);
   const [entryErrors, setEntryErrors] = useState({});
   const [headerErrors, setHeaderErrors] = useState({});
-  const [achievementErrors, setAchievementErrors] = useState({});
   const [message, setMessage] = useState('');
   const [showPrint, setShowPrint] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
 
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [browseFyStart, setBrowseFyStart] = useState(currentFyStart);
 
-  const isLocked = isReportLocked(meta);
-
-  const activePeriodRef = useRef(getPeriodKey(header));
-  const skipPeriodSwitchRef = useRef(true);
+  const isLocked = reportMeta.status === 'submitted';
+  const skipInitialLoadRef = useRef(true);
 
   useEffect(() => {
     authService.getCurrentUser()
@@ -233,75 +253,47 @@ export default function GovernmentTwistingUnitForm() {
   }, []);
 
   // NOTE: no "lock to own office" effect here — Government Twisting Unit
-  // offices now live in their own table (govt_twisting_offices) with their
-  // own id space, disjoint from poc_users.office_id (which still points at
-  // the shared poc_offices used by Private Reeling). Same precedent as
-  // Government Reeling Unit: a 'user' picks their office freely each time.
+  // offices live in their own table (govt_twisting_offices), disjoint from
+  // poc_users.office_id. Same precedent as Government Reeling Unit.
 
-  // Switching Region/Office/Month/Year loads that period's report — server-synced
-  // first, then U.L.M-carried-forward local draft — same pattern as the other 2 forms.
-  useEffect(() => {
-    if (!header.marketOfficeId || !header.month || !header.year) return;
-    const nextKey = getPeriodKey(header);
-    if (!nextKey) return;
-
-    if (skipPeriodSwitchRef.current) {
-      skipPeriodSwitchRef.current = false;
-      activePeriodRef.current = nextKey;
-      return;
-    }
-    if (nextKey === activePeriodRef.current) return;
-
-    const outgoingKey = activePeriodRef.current;
-    if (outgoingKey) {
-      saveMis34Report(outgoingKey, { header, achievementToTarget, units, meta });
-    }
-    activePeriodRef.current = nextKey;
-
-    let cancelled = false;
-    (async () => {
-      const fiscalYear = getFinancialYearKey(header.month, header.year);
-      try {
-        const remote = fiscalYear
-          ? await getCurrentReport({ officeId: header.marketOfficeId, fiscalYear, month: header.month })
-          : null;
-        if (remote?.data && Object.keys(remote.data).length > 0) {
-          saveMis34Report(nextKey, remote.data);
-        }
-      } catch (error) {
-        console.error('Failed to sync current-period twisting report from server:', error);
-      }
-      if (cancelled) return;
-      const loaded = loadMis34ReportForHeader(header);
-      setHeader(loaded.header);
-      setAchievementToTarget(loaded.achievementToTarget);
-      setUnits(loaded.units);
-      setMeta(loaded.meta);
-      setMessage(
-        loaded.meta?.ulmCarriedFrom
-          ? `U.L.M values carried from ${loaded.meta.ulmCarriedFrom.replace(/\|/g, ' / ')}.`
-          : ''
-      );
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [header.marketOfficeId, header.month, header.year]);
-
-  // Achievement to Target's Target row D.M is always re-derived fresh from
-  // the Target page's Yearly Target ÷ 12 whenever Office/Month/Year changes
-  // — same mechanism as Government Reeling Unit's Physical Target. Runs
-  // independently of (and after) the period-load effect above, since the
-  // fetched target has nothing to do with which local draft was loaded.
+  // Office/Month/Year selected -> get-or-create the poc_reports row (existing
+  // generic /api/reports), then load its normalized achievement/units/
+  // abstract from the new /api/twisting-reports/:id/full endpoint. All
+  // rollover math already happened server-side by the time this loads.
   useEffect(() => {
     if (!header.marketOfficeId || !header.month || !header.year) return undefined;
+    const fiscalYear = getFinancialYearKey(header.month, header.year);
+    if (!fiscalYear) return undefined;
+
     let cancelled = false;
-    const timer = setTimeout(async () => {
-      const dm = await applyCurrentTwistingTarget(header);
-      if (!cancelled && dm !== null) {
-        setAchievementToTarget((prev) => ({ ...prev, targetDm: dm }));
+    setLoadingReport(true);
+    (async () => {
+      try {
+        let report = await getCurrentReport({ officeId: header.marketOfficeId, fiscalYear, month: header.month });
+        if (!report) {
+          report = await saveReportDraft({ officeId: header.marketOfficeId, fiscalYear, month: header.month, data: {} });
+        }
+        if (cancelled) return;
+        setReportId(report.id);
+        setReportMeta({ status: report.status, submittedAt: report.submittedAt });
+
+        const full = await getFullTwistingReport(report.id);
+        if (cancelled) return;
+        setAchievement(full.achievement || emptyAchievement);
+        setUnits(full.units || []);
+        setAbstractData(full.abstract || { rows: [], grandTotal: null });
+        setEntryUnit(createEmptyUnit());
+        setEditingUnitId(null);
+        if (!skipInitialLoadRef.current) setMessage('');
+        skipInitialLoadRef.current = false;
+      } catch (error) {
+        console.error('Failed to load twisting report:', error);
+        if (!cancelled) setMessage('Failed to load this period\'s report — check your connection and try again.');
+      } finally {
+        if (!cancelled) setLoadingReport(false);
       }
-    }, 400);
-    return () => { cancelled = true; clearTimeout(timer); };
+    })();
+    return () => { cancelled = true; };
   }, [header.marketOfficeId, header.month, header.year]);
 
   const selectionFyStart = header.month && header.year ? getFyStart(header.month, header.year) : null;
@@ -323,93 +315,119 @@ export default function GovernmentTwistingUnitForm() {
     setEntryUnit((prev) => ({ ...prev, productionDetails: { ...prev.productionDetails, [key]: value } }));
   const handleTableFieldChange = (groupPath, dmKey, value) =>
     setEntryUnit((prev) => ({ ...prev, [groupPath]: { ...prev[groupPath], [dmKey]: value } }));
-  const handleAchievementField = (dmKey, value) =>
-    setAchievementToTarget((prev) => ({ ...prev, [dmKey]: value }));
+  const handleAchievedField = (value) =>
+    setAchievement((prev) => ({ ...prev, achieved: { ...prev.achieved, dm: value } }));
 
-  const computed = computeUnitTotals(entryUnit);
-  const tables = computeUnitTables(entryUnit);
-  const computedProduction = computeProductionUm(entryUnit.productionDetails);
-  const computedAchievement = computeAchievementUm(achievementToTarget);
+  // Live U.M preview for the unit currently being entered — display only;
+  // the authoritative U.M is always whatever the server returns after save.
+  const tables = useMemo(() => {
+    const out = {};
+    UNIT_TABLE_GROUPS.forEach(({ path, fields }) => {
+      const data = entryUnit[path] || {};
+      const computed = { ...data };
+      fields.forEach(({ ulmKey, dmKey, umKey }) => {
+        const ulm = Number(data[ulmKey]) || 0;
+        const dm = Number(data[dmKey]) || 0;
+        computed[umKey] = Math.round((ulm + dm) * 100) / 100;
+      });
+      out[path] = computed;
+    });
+    return out;
+  }, [entryUnit]);
 
-  const achievementRows = ACHIEVEMENT_REPORT_FIELDS.map((f) => ({
-    key: f.key,
-    label: f.label,
-    ulm: achievementToTarget?.[f.ulmKey],
-    dm: achievementToTarget?.[f.dmKey],
-    um: computedAchievement?.[f.umKey],
-    dmEditable: f.dmEditable && !isLocked,
-    onDmChange: (val) => handleAchievementField(f.dmKey, val),
-    dmError: achievementErrors[f.dmKey],
-  }));
+  const nscFields = UNIT_TABLE_GROUPS.find((g) => g.path === 'nscExpenditure').fields;
+  const costSaleFields = UNIT_TABLE_GROUPS.find((g) => g.path === 'costSaleValue').fields;
+  const productionFields = UNIT_TABLE_GROUPS.find((g) => g.path === 'productionDetails').fields.filter((f) => f.key !== 'spindlesInstalled');
+
+  const nscTotalPreview = nscFields.reduce(
+    (acc, f) => ({
+      ulm: acc.ulm + (Number(tables.nscExpenditure[f.ulmKey]) || 0),
+      dm: acc.dm + (Number(tables.nscExpenditure[f.dmKey]) || 0),
+      um: acc.um + (Number(tables.nscExpenditure[f.umKey]) || 0),
+    }),
+    { ulm: 0, dm: 0, um: 0 }
+  );
+  const wasteField = costSaleFields.find((f) => f.key === 'saleValueOfTwistedWaste');
+  const productionField = UNIT_TABLE_GROUPS.find((g) => g.path === 'productionDetails').fields.find((f) => f.key === 'productionOfTwistedRawSilk');
+  const netExpenditurePreview = {
+    dm: nscTotalPreview.dm - (Number(tables.costSaleValue[wasteField.dmKey]) || 0),
+    um: nscTotalPreview.um - (Number(tables.costSaleValue[wasteField.umKey]) || 0),
+  };
+  const productionDm = Number(tables.productionDetails[productionField.dmKey]) || 0;
+  const productionUm = Number(tables.productionDetails[productionField.umKey]) || 0;
+  const costPerKgPreview = {
+    dm: productionDm > 0 ? Math.round((netExpenditurePreview.dm / productionDm) * 100) / 100 : '',
+    um: productionUm > 0 ? Math.round((netExpenditurePreview.um / productionUm) * 100) / 100 : '',
+  };
+
+  const achievementRows = [
+    {
+      key: 'target', label: 'Target',
+      ulm: achievement.target.ulm, dm: achievement.target.dm, um: achievement.target.um,
+      dmEditable: false,
+    },
+    {
+      key: 'achieved', label: 'Achieved',
+      ulm: achievement.achieved.ulm, dm: achievement.achieved.dm, um: achievement.achieved.um,
+      dmEditable: !isLocked,
+      onDmChange: handleAchievedField,
+    },
+  ];
 
   const nscRows = [
-    ...buildRows(NSC_EXPENDITURE_TABLE_FIELDS, entryUnit.nscExpenditure, tables.nscExpenditure, 'nscExpenditure', handleTableFieldChange, entryErrors),
-    {
-      key: 'nscTotal',
-      label: 'TOTAL',
-      ulm: computed.nscTotal.ulm,
-      dm: computed.nscTotal.dm,
-      um: computed.nscTotal.um,
-      dmEditable: false,
-      emphasis: true,
-    },
+    ...buildRows(nscFields, entryUnit.nscExpenditure, tables.nscExpenditure, 'nscExpenditure', handleTableFieldChange, entryErrors),
+    { key: 'nscTotal', label: 'TOTAL', ulm: nscTotalPreview.ulm, dm: nscTotalPreview.dm, um: nscTotalPreview.um, dmEditable: false, emphasis: true },
   ];
 
   const costSaleRows = [
-    ...buildRows(COST_SALE_TABLE_FIELDS, entryUnit.costSaleValue, tables.costSaleValue, 'costSaleValue', handleTableFieldChange, entryErrors),
-    {
-      key: 'netExpenditure',
-      label: 'Net Expenditure (Rs)',
-      ulm: undefined,
-      dm: computed.netExpenditure.dm,
-      um: computed.netExpenditure.um,
-      dmEditable: false,
-      emphasis: true,
-    },
-    {
-      key: 'costOfProductionPerKg',
-      label: 'Cost of Production per Kg (Rs)',
-      ulm: undefined,
-      dm: computed.costOfProductionPerKg.dm === '' ? '—' : computed.costOfProductionPerKg.dm,
-      um: computed.costOfProductionPerKg.um === '' ? '—' : computed.costOfProductionPerKg.um,
-      dmEditable: false,
-      emphasis: true,
-    },
+    ...buildRows(costSaleFields, entryUnit.costSaleValue, tables.costSaleValue, 'costSaleValue', handleTableFieldChange, entryErrors),
+    { key: 'netExpenditure', label: 'Net Expenditure (Rs)', ulm: undefined, dm: netExpenditurePreview.dm, um: netExpenditurePreview.um, dmEditable: false, emphasis: true },
+    { key: 'costOfProductionPerKg', label: 'Cost of Production per Kg (Rs)', ulm: undefined, dm: costPerKgPreview.dm === '' ? '—' : costPerKgPreview.dm, um: costPerKgPreview.um === '' ? '—' : costPerKgPreview.um, dmEditable: false, emphasis: true },
   ];
 
-  const persistLocalDraft = (nextUnits, nextMeta, nextHeader = header, nextAchievement = achievementToTarget) => {
-    saveMis34Draft({ header: nextHeader, achievementToTarget: nextAchievement, units: nextUnits, meta: nextMeta });
-    const periodKey = getPeriodKey(nextHeader);
-    if (periodKey && !isReportLocked(nextMeta)) {
-      saveMis34Report(periodKey, { header: nextHeader, achievementToTarget: nextAchievement, units: nextUnits, meta: nextMeta });
-    }
+  const refreshFullReport = async () => {
+    if (!reportId) return;
+    const full = await getFullTwistingReport(reportId);
+    setAchievement(full.achievement || emptyAchievement);
+    setUnits(full.units || []);
+    setAbstractData(full.abstract || { rows: [], grandTotal: null });
   };
 
-  const handleSaveUnit = () => {
+  const handleSaveUnit = async () => {
     const result = validateUnit(entryUnit);
     if (!result.success) {
       setEntryErrors(zodFieldErrors(result.error));
       setMessage('Fix validation errors before saving this unit.');
       return;
     }
+    if (!reportId) {
+      setMessage('Select a Region and Office and a period before adding units.');
+      return;
+    }
     setEntryErrors({});
-
-    const nextUnits = editingUnitId
-      ? units.map((u) => (u.id === editingUnitId ? entryUnit : u))
-      : [...units, entryUnit];
-
-    setUnits(nextUnits);
-    persistLocalDraft(nextUnits, meta);
-    setEntryUnit(createEmptyUnit());
-    setEditingUnitId(null);
-    setMessage(editingUnitId ? 'Unit updated.' : 'Unit added to the list.');
+    setSaving(true);
+    try {
+      const payload = entryUnitToServerPayload(entryUnit);
+      if (editingUnitId) {
+        await updateTwistingUnit(reportId, editingUnitId, payload);
+      } else {
+        await createTwistingUnit(reportId, payload);
+      }
+      await refreshFullReport();
+      setEntryUnit(createEmptyUnit());
+      setEditingUnitId(null);
+      setMessage(editingUnitId ? 'Unit updated.' : 'Unit added to the list.');
+    } catch (error) {
+      console.error('Failed to save twisting unit:', error);
+      setMessage(error.message || 'Failed to save unit.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleEditUnit = (id) => {
-    const unit = units.find((u) => u.id === id);
-    if (!unit) return;
-    setEntryUnit(unit);
-    setEditingUnitId(id);
+  const handleEditUnit = (unit) => {
+    setEntryUnit(serverUnitToEntry(unit));
+    setEditingUnitId(unit.id);
     setMessage(`Editing ${unit.unitName || 'unit'} — save or cancel below.`);
   };
 
@@ -419,32 +437,25 @@ export default function GovernmentTwistingUnitForm() {
     setEntryErrors({});
   };
 
-  const handleDeleteUnit = (id) => {
-    const nextUnits = units.filter((u) => u.id !== id);
-    setUnits(nextUnits);
-    persistLocalDraft(nextUnits, meta);
-    if (editingUnitId === id) handleCancelEdit();
+  const handleDeleteUnit = async (unitId) => {
+    if (!reportId) return;
+    try {
+      await deleteTwistingUnit(reportId, unitId);
+      await refreshFullReport();
+      if (editingUnitId === unitId) handleCancelEdit();
+    } catch (error) {
+      console.error('Failed to delete twisting unit:', error);
+      setMessage(error.message || 'Failed to delete unit.');
+    }
   };
 
   const validateHeader = () => {
-    const result = mis34HeaderSchema.safeParse(header);
-    if (!result.success) {
-      setHeaderErrors(zodFieldErrors(result.error));
+    if (!header.region || !header.marketOfficeId || !header.month || !header.year) {
+      setHeaderErrors({ region: !header.region ? 'Region is required' : undefined, marketOfficeId: !header.marketOfficeId ? 'Office is required' : undefined });
       return false;
     }
     setHeaderErrors({});
     return true;
-  };
-
-  const persistToServer = async (targetHeader, targetAchievement, targetUnits, nextMeta) => {
-    const fiscalYear = getFinancialYearKey(targetHeader.month, targetHeader.year);
-    const saved = await saveReportDraft({
-      officeId: targetHeader.marketOfficeId,
-      fiscalYear,
-      month: targetHeader.month,
-      data: { header: targetHeader, achievementToTarget: targetAchievement, units: targetUnits, meta: nextMeta },
-    });
-    return saved;
   };
 
   const handleSaveReport = async () => {
@@ -452,23 +463,19 @@ export default function GovernmentTwistingUnitForm() {
       setMessage('This report is submitted and locked.');
       return;
     }
-    if (!validateHeader()) {
-      setMessage('Complete the shared header (Region, Market Office, Month, Year) before saving.');
+    if (!validateHeader() || !reportId) {
+      setMessage('Complete the shared header (Region, Office, Month, Year) before saving.');
       return;
     }
-    if (units.length === 0) {
-      setMessage('Add at least one twisting unit before saving.');
-      return;
-    }
-
     setSaving(true);
     try {
-      await persistToServer(header, achievementToTarget, units, meta);
-      persistLocalDraft(units, meta);
+      const dm = Number(achievement.achieved.dm) || 0;
+      await saveTwistingAchievement(reportId, dm);
+      await refreshFullReport();
       setMessage('Report saved as draft.');
     } catch (error) {
-      console.error('Failed to save twisting report:', error);
-      setMessage('Saved locally, but syncing to the server failed — check your connection and try again.');
+      console.error('Failed to save achievement:', error);
+      setMessage(error.message || 'Failed to save — check your connection and try again.');
     } finally {
       setSaving(false);
     }
@@ -479,83 +486,41 @@ export default function GovernmentTwistingUnitForm() {
       setMessage('This report is submitted and locked.');
       return;
     }
-    if (!validateHeader()) {
+    if (!validateHeader() || !reportId) {
       setMessage('Complete the shared header before submitting.');
       return;
     }
-
-    const achievementResult = mis34AchievementSchema.safeParse(achievementToTarget);
-    if (!achievementResult.success) {
-      setAchievementErrors(zodFieldErrors(achievementResult.error));
-      setMessage('Fix validation errors in Achievement to Target before submitting.');
-      return;
-    }
-    setAchievementErrors({});
-
-    const formResult = mis34FormSchema.safeParse({ header, achievementToTarget, units });
-    if (!formResult.success) {
-      setMessage('Resolve all validation errors before submitting — check each unit and add at least one.');
-      return;
-    }
-
-    let submittedBy = 'unknown';
-    try {
-      const user = await authService.getCurrentUser();
-      submittedBy = user?.user?.email || user?.user?.username || 'unknown';
-    } catch {
-      /* session unavailable in POC */
-    }
-
-    const result = submitMis34ReportWithRollover({ header, achievementToTarget, units, meta }, submittedBy);
-    if (!result.ok) {
-      setMessage(result.error);
+    if (units.length === 0) {
+      setMessage('Add at least one twisting unit before submitting.');
       return;
     }
 
     setSaving(true);
     try {
-      const saved = await persistToServer(
-        result.submittedReport.header,
-        result.submittedReport.achievementToTarget,
-        result.submittedReport.units,
-        result.submittedReport.meta
-      );
-      await submitReport(saved.id);
+      // Persist any not-yet-saved Achieved D.M edit before locking.
+      await saveTwistingAchievement(reportId, Number(achievement.achieved.dm) || 0);
+      const result = await submitTwistingReport(reportId);
 
-      if (result.nextDraft) {
-        await persistToServer(
-          result.nextDraft.header,
-          result.nextDraft.achievementToTarget,
-          result.nextDraft.units,
-          result.nextDraft.meta
-        );
+      const nextPeriod = nextCalendarPeriod(header.month, header.year);
+      skipInitialLoadRef.current = true;
+      if (nextPeriod && result.nextReportId) {
+        setHeader((prev) => ({ ...prev, month: nextPeriod.month, year: String(nextPeriod.year) }));
+        setReportId(result.nextReportId);
+        const full = await getFullTwistingReport(result.nextReportId);
+        setReportMeta({ status: 'draft', submittedAt: null });
+        setAchievement(full.achievement || emptyAchievement);
+        setUnits(full.units || []);
+        setAbstractData(full.abstract || { rows: [], grandTotal: null });
+        setEntryUnit(createEmptyUnit());
+        setEditingUnitId(null);
+        setMessage(`Report submitted and locked. Now showing the ${nextPeriod.month} ${nextPeriod.year} draft, with U.L.M carried forward from this month's U.M values.`);
+      } else {
+        setReportMeta({ status: result.report.status, submittedAt: result.report.submittedAt });
+        setMessage('Report submitted and locked.');
       }
-
-      // Move straight to next month's (carried U.L.M, blank D.M) draft rather
-      // than leaving this month's just-submitted values on screen.
-      const freshDraft = result.nextDraft || {
-        ...createMis34DefaultValues(),
-        header: { ...createMis34DefaultValues().header, adCode: result.submittedReport.header.adCode, disCode: result.submittedReport.header.disCode, regCode: result.submittedReport.header.regCode, region: result.submittedReport.header.region, marketOfficeId: result.submittedReport.header.marketOfficeId },
-      };
-      skipPeriodSwitchRef.current = true;
-      setHeader(freshDraft.header);
-      setAchievementToTarget(freshDraft.achievementToTarget);
-      setUnits(freshDraft.units);
-      setMeta(freshDraft.meta);
-      setEntryUnit(createEmptyUnit());
-      setEditingUnitId(null);
-      localStorage.setItem(MIS34_STORAGE_KEY, JSON.stringify(freshDraft));
-      activePeriodRef.current = getPeriodKey(freshDraft.header);
-
-      const nextLabel = result.nextHeader ? `${result.nextHeader.month} ${result.nextHeader.year}` : null;
-      setMessage(
-        nextLabel
-          ? `Report submitted and locked. Now showing the ${nextLabel} draft, with U.L.M carried forward from this month's U.M values.`
-          : 'Report submitted and locked.'
-      );
     } catch (error) {
       console.error('Failed to submit twisting report:', error);
-      setMessage('Submission failed to sync to the server. Please try again.');
+      setMessage(error.message || 'Submission failed. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -565,14 +530,13 @@ export default function GovernmentTwistingUnitForm() {
     return (
       <GovernmentTwistingUnitPrintView
         header={header}
-        achievementToTarget={achievementToTarget}
+        achievement={achievement}
         units={units}
+        abstractData={abstractData}
         onClose={() => setShowPrint(false)}
       />
     );
   }
-
-  const abstractRows = computeAbstract(units);
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4 md:p-6">
@@ -634,7 +598,6 @@ export default function GovernmentTwistingUnitForm() {
             onSelectMonth={({ month, year }) => setHeader((prev) => ({ ...prev, month, year: String(year) }))}
             disabled={isLocked}
           />
-          {headerErrors.month && <p className="mt-1 text-xs text-red-600">{headerErrors.month}</p>}
         </div>
         <div className="mt-4">
           <GovtTwistingOfficeSelect
@@ -667,13 +630,16 @@ export default function GovernmentTwistingUnitForm() {
         </div>
       )}
 
+      {loadingReport && (
+        <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">Loading report…</div>
+      )}
+
       {isLocked && (
         <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           <Lock className="h-4 w-4 shrink-0" />
           <span>
             Submitted report — locked
-            {meta.submittedAt ? ` on ${new Date(meta.submittedAt).toLocaleString()}` : ''}
-            {meta.submittedBy ? ` by ${meta.submittedBy}` : ''}.
+            {reportMeta.submittedAt ? ` on ${new Date(reportMeta.submittedAt).toLocaleString()}` : ''}.
           </span>
         </div>
       )}
@@ -730,7 +696,7 @@ export default function GovernmentTwistingUnitForm() {
           <div className="mt-4">
             <DataTable
               title="Production Details"
-              rows={buildRows(PRODUCTION_TABLE_FIELDS, entryUnit.productionDetails, computedProduction, 'productionDetails', handleTableFieldChange, entryErrors)}
+              rows={buildRows(productionFields, entryUnit.productionDetails, tables.productionDetails, 'productionDetails', handleTableFieldChange, entryErrors)}
             />
           </div>
 
@@ -746,7 +712,8 @@ export default function GovernmentTwistingUnitForm() {
             <button
               type="button"
               onClick={handleSaveUnit}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-light"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-primary px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-light disabled:opacity-50"
             >
               <Plus className="h-4 w-4" /> {editingUnitId ? 'Save changes' : 'Save twisting unit'}
             </button>
@@ -772,40 +739,36 @@ export default function GovernmentTwistingUnitForm() {
                 </tr>
               </thead>
               <tbody>
-                {units.map((unit) => {
-                  const totals = computeUnitTotals(unit);
-                  const production = computeProductionUm(unit.productionDetails || {});
-                  return (
-                    <tr key={unit.id} className="hover:bg-slate-50/80">
-                      <td className="border border-slate-100 px-3 py-2">{unit.unitName || '(unnamed unit)'}</td>
-                      <td className="border border-slate-100 px-3 py-2 text-right">{production.productionOfTwistedRawSilkDm || '—'}</td>
-                      <td className="border border-slate-100 px-3 py-2 text-right">{totals.nscTotal.dm || '—'}</td>
-                      <td className="border border-slate-100 px-3 py-2 text-right">{totals.costOfProductionPerKg.dm || '—'}</td>
-                      {!isLocked && (
-                        <td className="border border-slate-100 px-3 py-2">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleEditUnit(unit.id)}
-                              className="rounded p-1 text-slate-500 hover:bg-slate-100"
-                              title="Edit unit"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUnit(unit.id)}
-                              className="rounded p-1 text-red-500 hover:bg-red-50"
-                              title="Delete unit"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
+                {units.map((unit) => (
+                  <tr key={unit.id} className="hover:bg-slate-50/80">
+                    <td className="border border-slate-100 px-3 py-2">{unit.unitName || '(unnamed unit)'}</td>
+                    <td className="border border-slate-100 px-3 py-2 text-right">{unit.productionOfTwistedRawSilk?.dm || '—'}</td>
+                    <td className="border border-slate-100 px-3 py-2 text-right">{unit.totals?.nscTotal?.dm || '—'}</td>
+                    <td className="border border-slate-100 px-3 py-2 text-right">{unit.totals?.costOfProductionPerKg?.dm ?? '—'}</td>
+                    {!isLocked && (
+                      <td className="border border-slate-100 px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleEditUnit(unit)}
+                            className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                            title="Edit unit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUnit(unit.id)}
+                            className="rounded p-1 text-red-500 hover:bg-red-50"
+                            title="Delete unit"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -814,7 +777,7 @@ export default function GovernmentTwistingUnitForm() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h3 className="mb-1 text-base font-semibold text-emerald-secondary">Abstract</h3>
-        <p className="mb-3 text-xs text-slate-500">Auto-computed from the units above — never entered directly.</p>
+        <p className="mb-3 text-xs text-slate-500">Server-computed from the units above — never entered directly.</p>
         <div className="overflow-auto rounded-lg border border-slate-200">
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-emerald-muted">
@@ -827,8 +790,8 @@ export default function GovernmentTwistingUnitForm() {
               </tr>
             </thead>
             <tbody>
-              {abstractRows.map((row) => (
-                <tr key={row.key} className={row.isGrandTotal ? 'bg-amber-50 font-semibold' : 'hover:bg-slate-50'}>
+              {abstractData.rows.map((row) => (
+                <tr key={row.id} className="hover:bg-slate-50">
                   {ABSTRACT_COLUMNS.map((col) => (
                     <td key={col.id} className={clsx('border border-slate-100 px-3 py-2', col.id !== 'unitName' && 'text-right')}>
                       {row[col.id] === '' || row[col.id] == null ? '—' : row[col.id]}
@@ -836,6 +799,15 @@ export default function GovernmentTwistingUnitForm() {
                   ))}
                 </tr>
               ))}
+              {abstractData.grandTotal && (
+                <tr className="bg-amber-50 font-semibold">
+                  {ABSTRACT_COLUMNS.map((col) => (
+                    <td key={col.id} className={clsx('border border-slate-100 px-3 py-2', col.id !== 'unitName' && 'text-right')}>
+                      {abstractData.grandTotal[col.id] === '' || abstractData.grandTotal[col.id] == null ? '—' : abstractData.grandTotal[col.id]}
+                    </td>
+                  ))}
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -53,7 +53,8 @@ export const PRODUCTION_FIELDS = [
  * Production Details table — every row has a D.M (editable, entered this
  * month) and a U.M (read-only, = U.L.M + D.M). U.L.M is never entered
  * directly — carried forward automatically from last month's U.M for the
- * same unit (matched by unit name) at submit time; see mis34MonthRollover.js.
+ * same unit (matched by unit name) at submit time — now done server-side in
+ * the transaction backing POST /api/twisting-reports/:id/submit.
  */
 export const PRODUCTION_TABLE_FIELDS = [
   {

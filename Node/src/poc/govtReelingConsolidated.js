@@ -1,4 +1,4 @@
-import { query } from './postgres.js';
+import { query } from '../postgres.js';
 
 // Consolidated cross-office monthly report for Government Reeling Unit,
 // matching the real department workbook (POC PDL formats/Govt Reeling/GSRU

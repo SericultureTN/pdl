@@ -26,11 +26,13 @@ import {
   assertOwnOffice,
 } from './auth.js';
 import { initReportsSchema, reportsService, isMonthlyReelingType } from './reports.js';
-import { initGovtReelingOfficesSchema, listGovtReelingOffices } from './govtReelingOffices.js';
-import { initGovtTwistingOfficesSchema, listGovtTwistingOffices } from './govtTwistingOffices.js';
-import { buildGovtReelingWorkbook } from './govtReelingExport.js';
-import { getConsolidatedReport } from './govtReelingConsolidated.js';
-import { buildConsolidatedWorkbook } from './govtReelingConsolidatedExport.js';
+import { initGovtReelingOfficesSchema, listGovtReelingOffices } from './poc/govtReelingOffices.js';
+import { initGovtTwistingOfficesSchema, listGovtTwistingOffices } from './poc/govtTwistingOffices.js';
+import { initTwistingReportSchema, TWISTING_UNIT_FIELD_KEY_MAP } from './poc/twistingReportSchema.js';
+import { computeUnitTotals as computeTwistingUnitTotals, computeAbstract as computeTwistingAbstract, deriveMonthlyFromAnnual } from './poc/twistingCalculations.js';
+import { buildGovtReelingWorkbook } from './poc/govtReelingExport.js';
+import { getConsolidatedReport } from './poc/govtReelingConsolidated.js';
+import { buildConsolidatedWorkbook } from './poc/govtReelingConsolidatedExport.js';
 import { createMisRouter } from './mis/routes.js';
 import { initMisPostgres } from './mis/init-postgres.js';
 import { seedMisIfEmpty } from './mis/seed.js';
@@ -741,6 +743,311 @@ app.post("/api/reports/:id/submit", requireRole('admin', 'user'), async (req, re
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// Government Twisting Unit — normalized report_items/twisting_units child
+// tables (see twistingReportSchema.js). The report ROW itself (id/office/
+// month/fiscal_year/status) is still created/fetched/listed through the
+// generic /api/reports endpoints above (unitType=government_twisting) —
+// these routes only manage what hangs off report_id: the Achievement to
+// Target pair and the per-unit register rows, plus server-computed totals.
+// ═══════════════════════════════════════════════════════════════════════
+
+const MONTH_NAMES_FISCAL = [
+  'April', 'May', 'June', 'July', 'August', 'September',
+  'October', 'November', 'December', 'January', 'February', 'March',
+];
+
+async function loadTwistingReportOr404(reportId, req, res) {
+  const report = await reportsService.getById(reportId);
+  if (!report) {
+    res.status(404).json({ error: 'Report not found' });
+    return null;
+  }
+  if (report.unitType !== 'government_twisting') {
+    res.status(400).json({ error: 'Report is not a Government Twisting Unit report' });
+    return null;
+  }
+  if (!assertOwnOffice(report.officeId, req, res)) return null;
+  return report;
+}
+
+function unitRowToClientShape(row) {
+  const totals = computeTwistingUnitTotals(row);
+  const out = {
+    id: row.id,
+    unitName: row.unit_name,
+    unitCode: row.unit_code || '',
+    spindlesInstalled: Number(row.spindles_installed) || 0,
+    installedProductionCapacity: Number(row.installed_production_capacity) || 0,
+    spindlesInUse: Number(row.spindles_in_use) || 0,
+    totals: { nscTotal: totals.nscTotal, netExpenditure: totals.netExpenditure, costOfProductionPerKg: totals.costOfProductionPerKg },
+  };
+  TWISTING_UNIT_FIELD_KEY_MAP.forEach(([dbPrefix, camelKey]) => {
+    out[camelKey] = totals.fields[dbPrefix];
+  });
+  return out;
+}
+
+async function fetchAchievement(reportId, officeId, unitType, fiscalYear, monthInt) {
+  const { rows } = await query(
+    `SELECT item_key, ulm_value, dm_value FROM poc_report_items
+     WHERE report_id = $1 AND section = 'achievement_target' AND field_key = 'twistedSilkProductionKg'`,
+    [reportId]
+  );
+  const stored = Object.fromEntries(rows.map((r) => [r.item_key, r]));
+
+  let targetDm = 0;
+  const targetResult = await query(
+    `SELECT physical_target FROM poc_targets WHERE unit_type = $1 AND office_id = $2 AND fiscal_year = $3 AND is_current LIMIT 1`,
+    [unitType, officeId, fiscalYear]
+  );
+  const yearlyTarget = targetResult.rows[0]?.physical_target?.twistedSilkTarget;
+  if (yearlyTarget != null) targetDm = deriveMonthlyFromAnnual(yearlyTarget, monthInt);
+
+  const targetUlm = Number(stored.target?.ulm_value) || 0;
+  const achievedUlm = Number(stored.achieved?.ulm_value) || 0;
+  const achievedDm = Number(stored.achieved?.dm_value) || 0;
+
+  return {
+    target: { ulm: targetUlm, dm: targetDm, um: targetUlm + targetDm },
+    achieved: { ulm: achievedUlm, dm: achievedDm, um: achievedUlm + achievedDm },
+  };
+}
+
+app.get('/api/twisting-reports/:reportId/full', requireAuth, async (req, res) => {
+  try {
+    const reportId = Number(req.params.reportId);
+    if (!Number.isInteger(reportId)) return res.status(400).json({ error: 'Invalid report id' });
+    const report = await loadTwistingReportOr404(reportId, req, res);
+    if (!report) return;
+
+    const fiscalYearInt = parseInt(String(report.fiscalYear).split('-')[0], 10);
+    const monthInt = MONTH_NAMES_FISCAL.indexOf(report.month) + 1;
+
+    const achievement = await fetchAchievement(reportId, report.officeId, report.unitType, fiscalYearInt, monthInt);
+
+    const { rows: unitRows } = await query('SELECT * FROM poc_twisting_units WHERE report_id = $1 ORDER BY id', [reportId]);
+    const units = unitRows.map(unitRowToClientShape);
+    const abstractRaw = computeTwistingAbstract(unitRows);
+
+    return res.json({
+      ok: true,
+      report,
+      achievement,
+      units,
+      abstract: abstractRaw,
+    });
+  } catch (error) {
+    console.error('Get full twisting report error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/twisting-reports/:reportId/achievement  { achievedDm }
+app.put('/api/twisting-reports/:reportId/achievement', requireRole('admin', 'user'), async (req, res) => {
+  try {
+    const reportId = Number(req.params.reportId);
+    if (!Number.isInteger(reportId)) return res.status(400).json({ error: 'Invalid report id' });
+    const report = await loadTwistingReportOr404(reportId, req, res);
+    if (!report) return;
+    if (report.status === 'submitted') return res.status(409).json({ error: 'Report is submitted and locked' });
+
+    const { achievedDm } = req.body || {};
+    const dm = Number(achievedDm);
+    if (!Number.isFinite(dm) || dm < 0) return res.status(400).json({ error: 'achievedDm must be a non-negative number' });
+
+    await query(
+      `INSERT INTO poc_report_items (report_id, section, item_key, field_key, dm_value)
+       VALUES ($1, 'achievement_target', 'achieved', 'twistedSilkProductionKg', $2)
+       ON CONFLICT (report_id, section, item_key, field_key) DO UPDATE SET dm_value = EXCLUDED.dm_value, updated_at = now()`,
+      [reportId, dm]
+    );
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error('Save twisting achievement error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Builds the cols/values for an INSERT or UPDATE from the request body's
+// plain fields + TWISTING_UNIT_FIELD_KEY_MAP's `${camelKey}Dm` values —
+// only D.M (and name/code/plain fields) are ever client-writable; U.L.M is
+// server-managed (rollover-only) and U.M is a generated column.
+function twistingUnitWritableFields(body) {
+  const fields = {};
+  if (body.unitName !== undefined) fields.unit_name = String(body.unitName).trim();
+  if (body.unitCode !== undefined) fields.unit_code = body.unitCode ? String(body.unitCode) : null;
+  ['spindlesInstalled', 'installedProductionCapacity', 'spindlesInUse'].forEach((key) => {
+    const col = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+    if (body[key] !== undefined) fields[col] = Number(body[key]) || 0;
+  });
+  TWISTING_UNIT_FIELD_KEY_MAP.forEach(([dbPrefix, camelKey]) => {
+    const bodyKey = `${camelKey}Dm`;
+    if (body[bodyKey] !== undefined) {
+      const value = Number(body[bodyKey]);
+      if (!Number.isFinite(value) || value < 0) throw Object.assign(new Error(`${bodyKey} must be a non-negative number`), { status: 400 });
+      fields[`${dbPrefix}_dm`] = value;
+    }
+  });
+  return fields;
+}
+
+app.post('/api/twisting-reports/:reportId/units', requireRole('admin', 'user'), async (req, res) => {
+  try {
+    const reportId = Number(req.params.reportId);
+    if (!Number.isInteger(reportId)) return res.status(400).json({ error: 'Invalid report id' });
+    const report = await loadTwistingReportOr404(reportId, req, res);
+    if (!report) return;
+    if (report.status === 'submitted') return res.status(409).json({ error: 'Report is submitted and locked' });
+    if (!req.body?.unitName || !String(req.body.unitName).trim()) {
+      return res.status(400).json({ error: 'unitName is required' });
+    }
+
+    const fields = twistingUnitWritableFields(req.body);
+    const cols = ['report_id', ...Object.keys(fields)];
+    const values = [reportId, ...Object.values(fields)];
+    const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+
+    const { rows } = await query(
+      `INSERT INTO poc_twisting_units (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+      values
+    );
+    return res.status(201).json({ ok: true, unit: unitRowToClientShape(rows[0]) });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'A unit with this name already exists on this report' });
+    console.error('Create twisting unit error:', error);
+    return res.status(error.status || 500).json({ error: error.status ? error.message : 'Internal server error' });
+  }
+});
+
+app.put('/api/twisting-reports/:reportId/units/:unitId', requireRole('admin', 'user'), async (req, res) => {
+  try {
+    const reportId = Number(req.params.reportId);
+    const unitId = Number(req.params.unitId);
+    if (!Number.isInteger(reportId) || !Number.isInteger(unitId)) return res.status(400).json({ error: 'Invalid id' });
+    const report = await loadTwistingReportOr404(reportId, req, res);
+    if (!report) return;
+    if (report.status === 'submitted') return res.status(409).json({ error: 'Report is submitted and locked' });
+
+    const fields = twistingUnitWritableFields(req.body);
+    if (Object.keys(fields).length === 0) return res.status(400).json({ error: 'No editable fields provided' });
+
+    const setClause = Object.keys(fields).map((col, i) => `${col} = $${i + 3}`).join(', ');
+    const { rows } = await query(
+      `UPDATE poc_twisting_units SET ${setClause}, updated_at = now() WHERE id = $1 AND report_id = $2 RETURNING *`,
+      [unitId, reportId, ...Object.values(fields)]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Unit not found' });
+    return res.json({ ok: true, unit: unitRowToClientShape(rows[0]) });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'A unit with this name already exists on this report' });
+    console.error('Update twisting unit error:', error);
+    return res.status(error.status || 500).json({ error: error.status ? error.message : 'Internal server error' });
+  }
+});
+
+app.delete('/api/twisting-reports/:reportId/units/:unitId', requireRole('admin', 'user'), async (req, res) => {
+  try {
+    const reportId = Number(req.params.reportId);
+    const unitId = Number(req.params.unitId);
+    if (!Number.isInteger(reportId) || !Number.isInteger(unitId)) return res.status(400).json({ error: 'Invalid id' });
+    const report = await loadTwistingReportOr404(reportId, req, res);
+    if (!report) return;
+    if (report.status === 'submitted') return res.status(409).json({ error: 'Report is submitted and locked' });
+
+    const { rowCount } = await query('DELETE FROM poc_twisting_units WHERE id = $1 AND report_id = $2', [unitId, reportId]);
+    if (!rowCount) return res.status(404).json({ error: 'Unit not found' });
+    return res.status(204).send();
+  } catch (error) {
+    console.error('Delete twisting unit error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/twisting-reports/:reportId/submit — single transaction: lock this
+// report, then roll every U.M -> next month's U.L.M for both the Achievement
+// to Target pair and every named unit (matched by unit_name), creating next
+// month's poc_reports row if it doesn't exist yet.
+app.post('/api/twisting-reports/:reportId/submit', requireRole('admin', 'user'), async (req, res) => {
+  try {
+    const reportId = Number(req.params.reportId);
+    if (!Number.isInteger(reportId)) return res.status(400).json({ error: 'Invalid report id' });
+    const report = await loadTwistingReportOr404(reportId, req, res);
+    if (!report) return;
+    if (report.status === 'submitted') return res.status(409).json({ error: 'Already submitted' });
+
+    const fiscalYearInt = parseInt(String(report.fiscalYear).split('-')[0], 10);
+    const monthInt = MONTH_NAMES_FISCAL.indexOf(report.month) + 1;
+    const nextMonthInt = monthInt === 12 ? 1 : monthInt + 1;
+    const nextFiscalYearInt = monthInt === 12 ? fiscalYearInt + 1 : fiscalYearInt;
+
+    const result = await transaction(async (client) => {
+      const { rows: locked } = await client.query(
+        `SELECT * FROM poc_reports WHERE id = $1 FOR UPDATE`, [reportId]
+      );
+      if (locked[0].status === 'submitted') {
+        throw Object.assign(new Error('Already submitted'), { status: 409 });
+      }
+      await client.query(
+        `UPDATE poc_reports SET status = 'submitted', submitted_by_user_id = $2, submitted_at = now(), updated_at = now() WHERE id = $1`,
+        [reportId, req.user.id]
+      );
+
+      let { rows: nextRows } = await client.query(
+        `SELECT id FROM poc_reports WHERE office_id = $1 AND unit_type = 'government_twisting' AND fiscal_year = $2 AND month = $3`,
+        [report.officeId, nextFiscalYearInt, nextMonthInt]
+      );
+      let nextReportId = nextRows[0]?.id;
+      if (!nextReportId) {
+        const { rows: created } = await client.query(
+          `INSERT INTO poc_reports (unit_type, office_id, month, fiscal_year, data) VALUES ('government_twisting', $1, $2, $3, '{}'::jsonb) RETURNING id`,
+          [report.officeId, nextMonthInt, nextFiscalYearInt]
+        );
+        nextReportId = created[0].id;
+      }
+
+      // Achievement to Target: this month's U.M -> next month's U.L.M for both rows.
+      const { rows: items } = await client.query(
+        `SELECT item_key, um_value FROM poc_report_items WHERE report_id = $1 AND section = 'achievement_target'`,
+        [reportId]
+      );
+      for (const item of items) {
+        await client.query(
+          `INSERT INTO poc_report_items (report_id, section, item_key, field_key, ulm_value, dm_value)
+           VALUES ($1, 'achievement_target', $2, 'twistedSilkProductionKg', $3, 0)
+           ON CONFLICT (report_id, section, item_key, field_key) DO UPDATE SET ulm_value = EXCLUDED.ulm_value, updated_at = now()`,
+          [nextReportId, item.item_key, item.um_value]
+        );
+      }
+
+      // Units: this month's U.M -> next month's U.L.M, matched by unit_name;
+      // plain fields/name/code carried over so the register doesn't go blank.
+      const { rows: units } = await client.query('SELECT * FROM poc_twisting_units WHERE report_id = $1', [reportId]);
+      for (const unit of units) {
+        const ulmCols = TWISTING_UNIT_FIELD_KEY_MAP.map(([dbPrefix]) => `${dbPrefix}_ulm`);
+        const umValues = TWISTING_UNIT_FIELD_KEY_MAP.map(([dbPrefix]) => unit[`${dbPrefix}_um`]);
+        const insertCols = ['report_id', 'unit_name', 'unit_code', 'spindles_installed', 'installed_production_capacity', 'spindles_in_use', ...ulmCols];
+        const insertValues = [nextReportId, unit.unit_name, unit.unit_code, unit.spindles_installed, unit.installed_production_capacity, unit.spindles_in_use, ...umValues];
+        const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');
+        const updateSet = ulmCols.map((col) => `${col} = EXCLUDED.${col}`).join(', ');
+        await client.query(
+          `INSERT INTO poc_twisting_units (${insertCols.join(', ')}) VALUES (${placeholders})
+           ON CONFLICT (report_id, unit_name) DO UPDATE SET ${updateSet}, updated_at = now()`,
+          insertValues
+        );
+      }
+
+      return { nextReportId };
+    });
+
+    const updatedReport = await reportsService.getById(reportId);
+    return res.json({ ok: true, report: updatedReport, nextReportId: result.nextReportId });
+  } catch (error) {
+    console.error('Submit twisting report error:', error);
+    return res.status(error.status || 500).json({ error: error.status ? error.message : 'Internal server error' });
+  }
+});
+
 // GET /api/reports/export/excel?unitType=government_reeling&officeId=all&fiscalYear=&month=
 // Admin/secondary_admin only: one workbook covering every office for a month.
 app.get("/api/reports/export/excel", requireRole('admin', 'secondary_admin'), async (req, res) => {
@@ -889,6 +1196,7 @@ const startServer = async () => {
     await initReportsSchema();
     await initGovtReelingOfficesSchema();
     await initGovtTwistingOfficesSchema();
+    await initTwistingReportSchema();
 
     const schemaInitialized = await initializeDatabase();
     if (!schemaInitialized) {

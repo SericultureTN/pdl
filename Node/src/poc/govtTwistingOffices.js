@@ -1,4 +1,4 @@
-import { query } from './postgres.js';
+import { query } from '../postgres.js';
 
 // Government Twisting Unit's own office list — deliberately NOT part of the
 // shared poc_offices hierarchy (which Private Reeling still uses) and NOT
