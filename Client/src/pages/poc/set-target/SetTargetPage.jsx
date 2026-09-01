@@ -177,11 +177,25 @@ export default function SetTargetPage() {
 
   useEffect(() => {
     const ready = officeKeyed ? Boolean(officeId && fiscalYear) : Boolean(unitCode && fiscalYear);
-    if (!ready) {
-      setCurrentTargetId(null);
-      setLockedAt(null);
-      return undefined;
-    }
+
+    // Clear the "currently set" figures synchronously, the instant the
+    // selection identity (office/unit-code/fiscal-year/report-type) changes
+    // — before the debounced fetch below even starts. This effect only
+    // re-runs on a genuine selection change (physicalTarget/budgetOutlay
+    // aren't in its dependency array), so this fires exactly once per
+    // switch, with no chance for the user to have typed anything into the
+    // new context yet. The 300ms fetch below then either fills these back
+    // in with a real saved target or leaves them blank. Resetting them only
+    // after the debounced fetch resolves (the previous behavior) raced
+    // against typing instead: pick an office, start entering a value within
+    // 300ms, and the "no target yet" branch would silently wipe the field
+    // back to blank underneath you, right before Save.
+    setPhysicalTarget(emptyPhysical(reportType.physicalFields));
+    setBudgetOutlay(emptyBudget(reportType.budgetRows));
+    setCurrentTargetId(null);
+    setLockedAt(null);
+    if (!ready) return undefined;
+
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
@@ -190,10 +204,6 @@ export default function SetTargetPage() {
           : await getCurrentTarget({ unitType: reportTypeKey, unitCode, fiscalYear });
         if (cancelled) return;
         if (!target) {
-          setPhysicalTarget(emptyPhysical(reportType.physicalFields));
-          setBudgetOutlay(emptyBudget(reportType.budgetRows));
-          setCurrentTargetId(null);
-          setLockedAt(null);
           if (!officeKeyed) {
             setRegionId(null);
             setOfficeId(null);
