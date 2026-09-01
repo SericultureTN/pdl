@@ -14,12 +14,16 @@ const SECTION_DEFS = [
 // Used only when there's no legacy table to migrate from (a genuinely fresh
 // database) — same data that used to live in postgres.js/mis/constants.js.
 const FALLBACK_SEED = {
+  // Private Reeling Unit's office list (19 offices) — see also
+  // reconcilePocOfficeList() below, which brings an already-seeded database
+  // in line with this same list on every boot (this FALLBACK_SEED only
+  // fires once, on a genuinely fresh database with no groups yet).
   POC: [
-    { group: 'Dharmapuri', offices: ['Hosur', 'Krishnagiri', 'Dharmapuri'] },
-    { group: 'Erode', offices: ['Salem', 'Erode', 'Coimbatore', 'Udumalpet', 'Talavady'] },
-    { group: 'Vellore', offices: ['Vaniyambadi', 'Tiruvannamalai'] },
-    { group: 'Trichy', offices: ['Pudukottai', 'Rasipuram'] },
-    { group: 'Madurai', offices: ['Sivagangai', 'Theni', 'Nannagaram', 'Srivilliputhur', 'Nagarcoil'] },
+    { group: 'Dharmapuri', offices: ['Hosur', 'Denkanikottai', 'Krishnagiri', 'Dharmapuri', 'Pennagaram'] },
+    { group: 'Erode', offices: ['Salem', 'Coimbatore', 'Udumalpet', 'Erode', 'Talavady', 'Coonoor'] },
+    { group: 'Vellore', offices: ['Vaniyambadi', 'Tiruvannamalai', 'Villupuram'] },
+    { group: 'Trichy', offices: ['Trichy', 'Namakkal'] },
+    { group: 'Madurai', offices: ['Dindigul', 'Theni', 'Tenkasi'] },
   ],
   MIS: [
     { group: 'Dharmapuri Region', offices: ['Hosur', 'Denkanikottai', 'Krishnagiri', 'Dharmapuri', 'Pennagaram'] },
@@ -258,6 +262,53 @@ export async function migrateAndSeedHierarchy() {
       { table: 'mis_dfls_data', column: 'ad_office_id', refersTo: 'office' },
     ],
   });
+}
+
+// One-time-per-change, idempotent: brings the POC section's office list
+// (Private Reeling Unit's — Government Reeling/Twisting moved to their own
+// tables earlier this session) in line with FALLBACK_SEED.POC above, even on
+// a database where migrateOrSeedSection() already seeded the OLD 17-office
+// list and therefore won't touch it again (alreadyPopulated short-circuits
+// it forever). Unlike that one-shot seed, this reconciles every boot:
+// inserts any office missing from a region's target list, removes any
+// office no longer in it. Region groups themselves are unchanged (same 5
+// names as before) — only which offices sit under Trichy/Madurai actually
+// swap wholesale; Dharmapuri/Erode/Vellore just gain a couple of offices.
+// A removal that's still referenced by real data (sericulturists,
+// poc_targets, poc_reports) fails its own DELETE harmlessly — logged, not
+// thrown — rather than blocking boot or silently orphaning a name mismatch.
+export async function reconcilePocOfficeList() {
+  const sectionId = await getSectionIdByCode('POC');
+  if (!sectionId) return;
+
+  for (const { group: groupName, offices: targetNames } of FALLBACK_SEED.POC) {
+    let groupResult = await query('SELECT id FROM groups WHERE section_id = $1 AND name = $2', [sectionId, groupName]);
+    let groupId = groupResult.rows[0]?.id;
+    if (!groupId) {
+      const inserted = await query('INSERT INTO groups (section_id, name) VALUES ($1, $2) RETURNING id', [sectionId, groupName]);
+      groupId = inserted.rows[0].id;
+    }
+
+    const existing = await query('SELECT id, name FROM poc_offices WHERE section_id = $1 AND group_id = $2', [sectionId, groupId]);
+    const existingNames = new Set(existing.rows.map((r) => r.name));
+    const targetSet = new Set(targetNames);
+
+    for (const name of targetNames) {
+      if (!existingNames.has(name)) {
+        await query('INSERT INTO poc_offices (section_id, group_id, name) VALUES ($1, $2, $3)', [sectionId, groupId, name]);
+      }
+    }
+
+    for (const row of existing.rows) {
+      if (targetSet.has(row.name)) continue;
+      try {
+        await query('DELETE FROM poc_offices WHERE id = $1', [row.id]);
+      } catch (error) {
+        console.warn(`⚠️  Could not remove stale POC office "${row.name}" (id=${row.id}, region=${groupName}) — likely still referenced by existing data: ${error.message}`);
+      }
+    }
+  }
+  console.log('✅ Reconciled Private Reeling office list (POC section, 19 offices)');
 }
 
 export async function getSectionIdByCode(code) {

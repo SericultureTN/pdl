@@ -14,7 +14,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { testConnection, initializeDatabase, renamePocTables, closePool, query, transaction } from './postgres.js';
-import { initHierarchySchema, migrateAndSeedHierarchy, getSectionIdByCode, listSections, listGroups, listOffices } from './hierarchy.js';
+import { initHierarchySchema, migrateAndSeedHierarchy, reconcilePocOfficeList, getSectionIdByCode, listSections, listGroups, listOffices } from './hierarchy.js';
 import { initUsersSchema, migrateAndSeedUsers } from './user-migration.js';
 import {
   usersService,
@@ -1208,6 +1208,7 @@ const startServer = async () => {
     await initMisPostgres(misDb);
 
     await migrateAndSeedHierarchy();
+    await reconcilePocOfficeList();
     await migrateAndSeedUsers();
 
     const adminCheck = await query(`SELECT id FROM poc_users WHERE role = 'admin' LIMIT 1`);

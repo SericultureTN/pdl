@@ -22,13 +22,6 @@ export const POC_DATA_ENTRY_ITEMS = [
     breadcrumb: 'Dashboard > Data Entry > Twisting',
     placeholder: false,
   },
-  {
-    path: 'market',
-    label: 'Market',
-    title: 'Market',
-    breadcrumb: 'Dashboard > Data Entry > Market',
-    placeholder: true,
-  },
 ];
 
 export const POC_MAIN_NAV_ITEMS = [
