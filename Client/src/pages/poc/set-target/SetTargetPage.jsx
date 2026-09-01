@@ -175,25 +175,41 @@ export default function SetTargetPage() {
     refreshStatusList();
   }, [refreshStatusList]);
 
+  // Identifies "which target period" is being edited — office+fiscalYear for
+  // office-keyed types, unitCode+fiscalYear for the others. officeId is
+  // deliberately NOT part of this for non-office-keyed types: Region/Office
+  // there is advisory display state, not the persistence key, and the fetch
+  // below actively churns it (nulling it out when no target is found for
+  // this unitCode) — treating every officeId change as a new identity would
+  // make picking a Region/Office wipe whatever's being typed once that
+  // churn's own reset loops back around into this effect.
+  const targetIdentityRef = useRef('');
+
   useEffect(() => {
+    const identity = officeKeyed
+      ? `office:${reportTypeKey}|${officeId}|${fiscalYear}`
+      : `unit:${reportTypeKey}|${unitCode}|${fiscalYear}`;
+    const identityChanged = identity !== targetIdentityRef.current;
+    targetIdentityRef.current = identity;
+
     const ready = officeKeyed ? Boolean(officeId && fiscalYear) : Boolean(unitCode && fiscalYear);
 
     // Clear the "currently set" figures synchronously, the instant the
-    // selection identity (office/unit-code/fiscal-year/report-type) changes
-    // — before the debounced fetch below even starts. This effect only
-    // re-runs on a genuine selection change (physicalTarget/budgetOutlay
-    // aren't in its dependency array), so this fires exactly once per
-    // switch, with no chance for the user to have typed anything into the
-    // new context yet. The 300ms fetch below then either fills these back
-    // in with a real saved target or leaves them blank. Resetting them only
-    // after the debounced fetch resolves (the previous behavior) raced
-    // against typing instead: pick an office, start entering a value within
-    // 300ms, and the "no target yet" branch would silently wipe the field
-    // back to blank underneath you, right before Save.
-    setPhysicalTarget(emptyPhysical(reportType.physicalFields));
-    setBudgetOutlay(emptyBudget(reportType.budgetRows));
-    setCurrentTargetId(null);
-    setLockedAt(null);
+    // identity above actually changes — before the debounced fetch below
+    // even starts, and only when it's a genuine switch (see identityChanged
+    // above), not on every officeId churn. The 300ms fetch below then either
+    // fills these back in with a real saved target or leaves them blank.
+    // Resetting them only after the debounced fetch resolves (the previous
+    // behavior) raced against typing instead: pick an office, start
+    // entering a value within 300ms, and the "no target yet" branch would
+    // silently wipe the field back to blank underneath you, right before
+    // Save.
+    if (identityChanged) {
+      setPhysicalTarget(emptyPhysical(reportType.physicalFields));
+      setBudgetOutlay(emptyBudget(reportType.budgetRows));
+      setCurrentTargetId(null);
+      setLockedAt(null);
+    }
     if (!ready) return undefined;
 
     let cancelled = false;
