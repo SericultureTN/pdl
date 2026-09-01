@@ -219,13 +219,15 @@ export default function SetTargetPage() {
           ? await getCurrentTarget({ unitType: reportTypeKey, officeId, fiscalYear })
           : await getCurrentTarget({ unitType: reportTypeKey, unitCode, fiscalYear });
         if (cancelled) return;
-        if (!target) {
-          if (!officeKeyed) {
-            setRegionId(null);
-            setOfficeId(null);
-          }
-          return;
-        }
+        // No target for this unit-code+fiscalYear yet — the common case, not
+        // an error. Region/Office isn't part of a non-office-keyed target's
+        // identity, so there's nothing to load into it; deliberately leave
+        // whatever the user already picked alone. This used to null Region/
+        // Office back to unselected right here, which fired on every "no
+        // target yet" result (i.e. almost every pick) and made the dropdowns
+        // visibly snap back to "Select Region"/"Select Office" a moment
+        // after choosing them.
+        if (!target) return;
         setPhysicalTarget({ ...emptyPhysical(reportType.physicalFields), ...(target.physicalTarget || {}) });
         setBudgetOutlay(reportType.budgetRows ? { ...emptyBudget(reportType.budgetRows), ...(target.budgetOutlay || {}) } : null);
         setCurrentTargetId(target.id);
