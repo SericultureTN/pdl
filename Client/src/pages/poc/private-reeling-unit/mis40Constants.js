@@ -138,7 +138,7 @@ export const KG_FIELD_GROUPS = [
     // D.M here is NOT manually entered — auto-derived from the beneficiary's
     // Yearly Silk Production Capacity (Beneficiary section, above) ÷ 12. See
     // dmEditable below and computeRowUm in mis40Calculations.js.
-    key: 'silkProductionCapacity', section: 'Silk Production (Kgs)', label: 'Production Capacity',
+    key: 'silkProductionCapacity', section: 'Silk Production (Kgs)', label: 'Target',
     ulmKey: 'silkProductionCapacityUlm', dmKey: 'silkProductionCapacityDm', umKey: 'silkProductionCapacityUm',
     dmEditable: false,
   },
