@@ -101,6 +101,11 @@ export const EDITABLE_CATEGORY_IDS = ['arm', 'charka', 'cottage', 'mrm'];
 export const BENEFICIARY_FIELDS = [
   { key: 'beneficiaryName', label: 'Name of the Beneficiary', type: 'text', required: true },
   { key: 'place', label: 'Place', type: 'text' },
+  // Feeds Silk Production Capacity's D.M in KG_FIELD_GROUPS below (Yearly ÷ 12,
+  // April-start fiscal year — same mechanism as Government Reeling Unit's
+  // Physical Target). Entered once; carried forward unchanged month to month
+  // by mis40MonthRollover.js, same as the beneficiary's name/place.
+  { key: 'yearlySilkProductionCapacity', label: 'Yearly Silk Production Capacity (Kgs)', type: 'number' },
 ];
 
 export const INSTALLED_FUNCTIONAL_FIELDS = [
@@ -130,8 +135,12 @@ export const KG_FIELD_GROUPS = [
     ulmKey: 'silkProductionUlm', dmKey: 'silkProductionDm', umKey: 'silkProductionUm',
   },
   {
+    // D.M here is NOT manually entered — auto-derived from the beneficiary's
+    // Yearly Silk Production Capacity (Beneficiary section, above) ÷ 12. See
+    // dmEditable below and computeRowUm in mis40Calculations.js.
     key: 'silkProductionCapacity', section: 'Silk Production (Kgs)', label: 'Production Capacity',
     ulmKey: 'silkProductionCapacityUlm', dmKey: 'silkProductionCapacityDm', umKey: 'silkProductionCapacityUm',
+    dmEditable: false,
   },
   {
     key: 'functionalDays', section: 'Silk Production (Kgs)', label: 'Functional Days',

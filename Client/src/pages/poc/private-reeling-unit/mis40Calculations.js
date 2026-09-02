@@ -1,4 +1,5 @@
 import { NUMERIC_ROW_FIELDS, KG_FIELD_GROUPS } from './mis40Constants.js';
+import { deriveMonthlyFromAnnual } from './deriveMonthlyFromAnnual.js';
 
 function num(value) {
   const parsed = Number(value);
@@ -9,11 +10,27 @@ function round2(value) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Silk Production Capacity's D.M is never entered directly — it's derived
+ * fresh every time from the beneficiary's Yearly Silk Production Capacity ÷
+ * 12 for the given fiscal month. Requires `month` (the report period's
+ * month, e.g. from header.month) — without it, the row's D.M is left as
+ * whatever's already stored (e.g. a rollover-carried snapshot).
+ */
+function applyDerivedDmFields(row, month) {
+  if (!month) return row;
+  return {
+    ...row,
+    silkProductionCapacityDm: deriveMonthlyFromAnnual(row.yearlySilkProductionCapacity, month),
+  };
+}
+
 /** U.M is never entered directly — always U.L.M + D.M for each Kg field group. */
-export function computeRowUm(row) {
-  const next = { ...row };
+export function computeRowUm(row, month) {
+  const withDerivedDm = applyDerivedDmFields(row, month);
+  const next = { ...withDerivedDm };
   KG_FIELD_GROUPS.forEach(({ ulmKey, dmKey, umKey }) => {
-    next[umKey] = round2(num(row[ulmKey]) + num(row[dmKey]));
+    next[umKey] = round2(num(withDerivedDm[ulmKey]) + num(withDerivedDm[dmKey]));
   });
   return next;
 }
@@ -31,16 +48,16 @@ export function computeRowRenditta(row) {
   };
 }
 
-export function computeRowsWithCalculations(rows) {
+export function computeRowsWithCalculations(rows, month) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row, index) => ({
-    ...computeRowRenditta(computeRowUm(row)),
+    ...computeRowRenditta(computeRowUm(row, month)),
     sNo: index + 1,
   }));
 }
 
-export function computeTotalRow(rows) {
-  const computedRows = computeRowsWithCalculations(rows);
+export function computeTotalRow(rows, month) {
+  const computedRows = computeRowsWithCalculations(rows, month);
   const totals = { label: 'TOTAL', isTotal: true };
 
   NUMERIC_ROW_FIELDS.forEach((field) => {
@@ -71,6 +88,7 @@ export function createEmptyRow() {
     id: createRowId(),
     beneficiaryName: '',
     place: '',
+    yearlySilkProductionCapacity: '',
     installedUnit: '',
     installedDevice: '',
     functionalUnit: '',

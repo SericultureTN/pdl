@@ -28,7 +28,7 @@ function round2(value) {
  *
  * Client-side: aggregate each category's detail grid rows into abstract rows.
  */
-export function computeAbstractFromCategories(categories = {}) {
+export function computeAbstractFromCategories(categories = {}, month) {
   const safeCategories = categories && typeof categories === 'object' ? categories : {};
 
   const abstractRows = ABSTRACT_UNIT_TYPES.map((unitType) => {
@@ -46,7 +46,7 @@ export function computeAbstractFromCategories(categories = {}) {
       // U.M is never persisted on the stored row (only computed for display) —
       // recompute from U.L.M + D.M here, same as computeTotalRow does, or
       // every *Um column below would silently sum to 0.
-      const sourceRows = computeRowsWithCalculations(safeCategories[unitType.sourceCategory].rows);
+      const sourceRows = computeRowsWithCalculations(safeCategories[unitType.sourceCategory].rows, month);
       NUMERIC_ROW_FIELDS.forEach((field) => {
         row[field] = round2(sourceRows.reduce((acc, r) => acc + num(r[field]), 0));
       });
@@ -70,15 +70,15 @@ export function computeAbstractFromCategories(categories = {}) {
   return { rows: abstractRows, grandTotal };
 }
 
-export function getAbstractAsTableData(categories) {
-  const { rows, grandTotal } = computeAbstractFromCategories(categories);
+export function getAbstractAsTableData(categories, month) {
+  const { rows, grandTotal } = computeAbstractFromCategories(categories, month);
   return [...rows, grandTotal];
 }
 
 /** Mirrors DB aggregation for a single register category */
-export function aggregateCategoryRows(rows) {
+export function aggregateCategoryRows(rows, month) {
   if (!rows?.length) {
     return Object.fromEntries(NUMERIC_ROW_FIELDS.map((f) => [f, 0]));
   }
-  return computeTotalRow(rows);
+  return computeTotalRow(rows, month);
 }

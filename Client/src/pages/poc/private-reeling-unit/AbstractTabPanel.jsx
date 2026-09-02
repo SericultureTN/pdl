@@ -4,8 +4,8 @@ import { getAbstractAsTableData } from './mis40AbstractQuery.js';
 
 export default function AbstractTabPanel({ categories, header }) {
   const tableData = useMemo(
-    () => getAbstractAsTableData(categories),
-    [categories]
+    () => getAbstractAsTableData(categories, header?.month),
+    [categories, header?.month]
   );
 
   return (

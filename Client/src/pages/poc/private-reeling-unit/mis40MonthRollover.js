@@ -63,14 +63,20 @@ export function findSubmittedReport(marketOfficeId, period) {
   return report?.meta?.status === 'submitted' ? report : null;
 }
 
-/** Beneficiary-by-name -> { place, [ulmKey]: thisMonth's U.M } for one category's rows. */
-function extractCarryForwardFromCategoryRows(rows) {
-  const computed = computeRowsWithCalculations(rows);
+/** Beneficiary-by-name -> { place, yearlySilkProductionCapacity, [ulmKey]: thisMonth's U.M } for one category's rows. */
+function extractCarryForwardFromCategoryRows(rows, month) {
+  const computed = computeRowsWithCalculations(rows, month);
   const carry = {};
   computed.forEach((row) => {
     const key = normalizeName(row.beneficiaryName);
     if (!key) return;
-    const entry = { beneficiaryName: row.beneficiaryName, place: row.place || '' };
+    const entry = {
+      beneficiaryName: row.beneficiaryName,
+      place: row.place || '',
+      // Carried forward unchanged, same as name/place — it's an annual
+      // figure, not something re-entered every month.
+      yearlySilkProductionCapacity: row.yearlySilkProductionCapacity ?? '',
+    };
     KG_FIELD_GROUPS.forEach(({ ulmKey, umKey }) => {
       entry[ulmKey] = row[umKey] === '' || row[umKey] == null ? 0 : row[umKey];
     });
@@ -99,6 +105,7 @@ function buildNextCategoryRows(carryMap, existingRows = []) {
     const row = createEmptyRow();
     row.beneficiaryName = carry.beneficiaryName || nameKey;
     row.place = carry.place || '';
+    row.yearlySilkProductionCapacity = carry.yearlySilkProductionCapacity ?? '';
     KG_FIELD_GROUPS.forEach(({ ulmKey }) => {
       row[ulmKey] = carry[ulmKey];
     });
@@ -129,7 +136,7 @@ export function loadMis40ReportForHeader(header) {
   if (priorSubmitted) {
     EDITABLE_CATEGORY_IDS.forEach((categoryId) => {
       const priorRows = priorSubmitted.categories?.[categoryId]?.rows || [];
-      const carryMap = extractCarryForwardFromCategoryRows(priorRows);
+      const carryMap = extractCarryForwardFromCategoryRows(priorRows, priorSubmitted.header?.month);
       report.categories[categoryId].rows = buildNextCategoryRows(carryMap, []);
     });
     report.meta = {
@@ -192,7 +199,7 @@ export function submitMis40ReportWithRollover(report, submittedBy = 'unknown') {
 
   EDITABLE_CATEGORY_IDS.forEach((categoryId) => {
     const thisMonthRows = submittedReport.categories?.[categoryId]?.rows || [];
-    const carryMap = extractCarryForwardFromCategoryRows(thisMonthRows);
+    const carryMap = extractCarryForwardFromCategoryRows(thisMonthRows, report.header?.month);
     const existingNextRows = nextDraft.categories?.[categoryId]?.rows || [];
     nextDraft.categories[categoryId].rows = buildNextCategoryRows(carryMap, existingNextRows);
   });

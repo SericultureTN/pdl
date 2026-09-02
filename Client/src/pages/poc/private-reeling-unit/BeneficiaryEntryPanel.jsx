@@ -66,7 +66,10 @@ function KgFieldTable({ section, entryRow, computedEntry, onFieldChange, errors 
           <tbody>
             {section.groups.map((g) => (
               <tr key={g.key}>
-                <td className="border border-slate-200 px-3 py-2 font-normal text-slate-700">{g.label}</td>
+                <td className="border border-slate-200 px-3 py-2 font-normal text-slate-700">
+                  {g.label}
+                  {g.dmEditable === false && <span className="ml-1 text-emerald-primary">(auto)</span>}
+                </td>
                 <td className="border border-slate-200 px-2 py-1">
                   <input
                     type="text"
@@ -76,15 +79,26 @@ function KgFieldTable({ section, entryRow, computedEntry, onFieldChange, errors 
                   />
                 </td>
                 <td className="border border-slate-200 px-2 py-1">
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={entryRow[g.dmKey] ?? ''}
-                    onChange={(e) => onFieldChange(g.dmKey, e.target.value)}
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-right outline-none transition focus:ring-2 focus:ring-emerald-primary/30"
-                  />
-                  {errors[g.dmKey] && <p className="text-[10px] text-red-600">{errors[g.dmKey]}</p>}
+                  {g.dmEditable === false ? (
+                    <input
+                      type="text"
+                      readOnly
+                      value={entryRow[g.dmKey] === '' || entryRow[g.dmKey] == null ? 0 : entryRow[g.dmKey]}
+                      className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-right text-slate-600"
+                    />
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={entryRow[g.dmKey] ?? ''}
+                        onChange={(e) => onFieldChange(g.dmKey, e.target.value)}
+                        className="w-full rounded border border-slate-300 px-2 py-1 text-right outline-none transition focus:ring-2 focus:ring-emerald-primary/30"
+                      />
+                      {errors[g.dmKey] && <p className="text-[10px] text-red-600">{errors[g.dmKey]}</p>}
+                    </>
+                  )}
                 </td>
                 <td className="border border-slate-200 px-2 py-1">
                   <input
@@ -120,15 +134,15 @@ function groupBySection(groups) {
 
 const KG_SECTIONS = groupBySection(KG_FIELD_GROUPS);
 
-export default function BeneficiaryEntryPanel({ category, rows, onRowsChange, isLocked }) {
+export default function BeneficiaryEntryPanel({ category, rows, onRowsChange, isLocked, month }) {
   const [entryRow, setEntryRow] = useState(createEmptyRow());
   const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
 
   const safeRows = Array.isArray(rows) ? rows : [];
-  const computedEntry = computeRowsWithCalculations([entryRow])[0];
-  const computedRows = computeRowsWithCalculations(safeRows);
-  const totals = computeTotalRow(safeRows);
+  const computedEntry = computeRowsWithCalculations([entryRow], month)[0];
+  const computedRows = computeRowsWithCalculations(safeRows, month);
+  const totals = computeTotalRow(safeRows, month);
 
   const handleTopField = (key, value) => setEntryRow((prev) => ({ ...prev, [key]: value }));
 
@@ -193,6 +207,7 @@ export default function BeneficiaryEntryPanel({ category, rows, onRowsChange, is
                 <TextField
                   key={f.key}
                   label={f.label}
+                  type={f.type}
                   value={entryRow[f.key]}
                   onChange={(val) => handleTopField(f.key, val)}
                   error={errors[f.key]}
@@ -246,9 +261,7 @@ export default function BeneficiaryEntryPanel({ category, rows, onRowsChange, is
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        {safeRows.length === 0 ? (
-          <p className="text-sm text-slate-500">No beneficiaries added yet.</p>
-        ) : (
+        {safeRows.length > 0 && (
           <div className="overflow-auto rounded-lg border border-slate-200">
             <table className="min-w-full border-collapse text-sm">
               <thead className="bg-emerald-muted">

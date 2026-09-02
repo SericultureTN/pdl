@@ -21,6 +21,7 @@ export const mis40RowSchema = z.object({
   id: z.string(),
   beneficiaryName: z.string().min(1, 'Beneficiary name is required'),
   place: z.string().optional(),
+  yearlySilkProductionCapacity: nonNegativeNumber,
   installedUnit: nonNegativeNumber,
   installedDevice: nonNegativeNumber,
   functionalUnit: nonNegativeNumber,

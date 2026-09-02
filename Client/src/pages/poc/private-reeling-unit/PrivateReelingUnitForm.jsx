@@ -317,6 +317,7 @@ export default function PrivateReelingUnitForm() {
               setHeader((prev) => ({ ...prev, regionId: regionId ?? '', marketOfficeId: marketOfficeId ?? '' }))
             }
             disabled={isLocked || currentUserRole === 'user'}
+            officeLabel="Private Reeling Units"
             required
           />
           {(headerErrors.regionId || headerErrors.marketOfficeId) && (
@@ -367,6 +368,7 @@ export default function PrivateReelingUnitForm() {
           rows={Array.isArray(categories[activeTab]?.rows) ? categories[activeTab].rows : []}
           onRowsChange={(rows) => handleRowsChange(activeTab, rows)}
           isLocked={isLocked}
+          month={header.month}
         />
       ) : null}
 

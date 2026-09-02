@@ -35,8 +35,8 @@ export default function PrivateReelingUnitPrintView({ header, categories, onClos
         </div>
 
         {CATEGORY_TABS.filter((t) => t.id !== 'abstract').map((tab) => {
-          const rows = computeRowsWithCalculations(categories[tab.id]?.rows || []);
-          const total = computeTotalRow(rows);
+          const rows = computeRowsWithCalculations(categories[tab.id]?.rows || [], header.month);
+          const total = computeTotalRow(rows, header.month);
 
           return (
             <div key={tab.id} className="break-inside-avoid">
@@ -101,7 +101,7 @@ export default function PrivateReelingUnitPrintView({ header, categories, onClos
               </tr>
             </thead>
             <tbody>
-              {getAbstractAsTableData(categories).map((row) => (
+              {getAbstractAsTableData(categories, header.month).map((row) => (
                 <tr key={row.key} className={row.isGrandTotal ? 'bg-amber-50 font-bold' : ''}>
                   <td className="border border-slate-200 px-2 py-0.5">{row.unitType}</td>
                   <td className="border border-slate-200 px-2 py-0.5 text-right">{row.installedUnit ?? 0}</td>
